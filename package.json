@@ -15,7 +15,8 @@
     "user:reset-password": "tsx scripts/user.ts reset-password",
     "user:enable-2fa": "tsx scripts/user.ts enable-2fa",
     "user:disable-2fa": "tsx scripts/user.ts disable-2fa",
-    "user:disable": "tsx scripts/user.ts disable"
+    "user:disable": "tsx scripts/user.ts disable",
+    "smoke:live": "tsx scripts/smoke-live.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
