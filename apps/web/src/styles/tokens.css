@@ -1,0 +1,58 @@
+/* Design tokens, verbatim from design/Seerah Timeline.dc.html */
+:root,[data-theme="light"]{
+--f-ui:var(--font-hind),'Hind Siliguri','Amiri',sans-serif;
+--f-read:var(--font-noto-serif),'Noto Serif Bengali','Amiri',serif;
+--f-ar:var(--font-amiri),'Amiri','Noto Naskh Arabic',serif;
+--bg:#F3EBDD;
+--surface:#FAF6EE;
+--surface-2:#ECE2CF;
+--ink:#1E1A16;
+--ink-2:#5B5047;
+--ink-3:#8A7D6C;
+--line:#DCCFB8;
+--primary:#2E6A61;
+--primary-strong:#22514A;
+--primary-tint:#DCE7DF;
+--on-primary:#FAF6EE;
+--gold:#B48A3C;
+--gold-ink:#755819;
+--gold-tint:#F1E3C2;
+--wrong:#9A4B3A;
+--wrong-tint:#F3DFD6;
+--map-sea:#DDE3DA;
+--map-land:#F0E6D2;
+--map-coast:#B7A687;
+--map-grid:rgba(46,106,97,.10);
+--map-halo:#F0E6D2;
+--map-marker:#2E6A61;
+--map-route:#2E6A61;
+--map-sea-ink:#6E7F78;
+--pattern-op:.10;
+--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%232E6A61' stroke-width='1'%3E%3Crect x='14' y='14' width='20' height='20'/%3E%3Crect x='14' y='14' width='20' height='20' transform='rotate(45 24 24)'/%3E%3Cpath d='M0 0l14 14M48 0L34 14M0 48l14-14M48 48L34 34M24 0v10M24 38v10M0 24h10M38 24h10'/%3E%3C/g%3E%3C/svg%3E");color-scheme:light}
+
+[data-theme="dark"]{--bg:#0D1524;
+--surface:#142035;
+--surface-2:#1A2841;
+--ink:#EEE5D1;
+--ink-2:#B8AD98;
+--ink-3:#7F8AA0;
+--line:#27354F;
+--primary:#7FBFB2;
+--primary-strong:#A3D6CA;
+--primary-tint:#173537;
+--on-primary:#0D1524;
+--gold:#D6B46A;
+--gold-ink:#E6CB8D;
+--gold-tint:#332B1B;
+--wrong:#E6A08C;
+--wrong-tint:#3A2323;
+--map-sea:#0B1322;
+--map-land:#1A2740;
+--map-coast:#3B4D6E;
+--map-grid:rgba(127,191,178,.08);
+--map-halo:#1A2740;
+--map-marker:#7FBFB2;
+--map-route:#7FBFB2;
+--map-sea-ink:#7088A0;
+--pattern-op:.13;
+--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%23D6B46A' stroke-width='1'%3E%3Crect x='14' y='14' width='20' height='20'/%3E%3Crect x='14' y='14' width='20' height='20' transform='rotate(45 24 24)'/%3E%3Cpath d='M0 0l14 14M48 0L34 14M0 48l14-14M48 48L34 34M24 0v10M24 38v10M0 24h10M38 24h10'/%3E%3C/g%3E%3C/svg%3E");color-scheme:dark}

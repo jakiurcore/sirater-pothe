@@ -3,12 +3,26 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./schema": "./src/schema.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
   "scripts": {
     "generate": "drizzle-kit generate",
     "test": "vitest run",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "seed:sql": "tsx seed/generate.ts"
   },
-  "dependencies": { "drizzle-orm": "^0.45.3", "@seerah/content": "workspace:*" },
-  "devDependencies": { "drizzle-kit": "^0.31.11", "vitest": "^5.0.3", "typescript": "^5.9.3", "@types/node": "^22.0.0", "@cloudflare/workers-types": "^5.20261008.1" }
+  "dependencies": {
+    "drizzle-orm": "^0.45.3",
+    "@seerah/content": "workspace:*"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.11",
+    "vitest": "^5.0.3",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.0.0",
+    "@cloudflare/workers-types": "^5.20261008.1",
+    "tsx": "^4.23.15"
+  }
 }

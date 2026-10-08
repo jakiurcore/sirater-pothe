@@ -7,3 +7,6 @@ dist
 *.log
 .env*
 !.env.example
+seed/seed.sql
+seed/seed.dev.sql
+apps/web/tiles/*.pmtiles

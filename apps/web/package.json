@@ -1,0 +1,43 @@
+{
+  "name": "@seerah/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "preview": "node scripts/copy-maplibre.mjs && opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "node scripts/copy-maplibre.mjs && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload": "node scripts/copy-maplibre.mjs && opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "predev": "node scripts/copy-maplibre.mjs",
+    "prebuild": "node scripts/copy-maplibre.mjs",
+    "db:local": "wrangler d1 migrations apply seerah --local && wrangler d1 execute seerah --local --file ../../packages/db/seed/seed.dev.sql && wrangler r2 object put seerah-tiles/arabia.pmtiles --file tiles/arabia.pmtiles --local",
+    "e2e": "playwright test",
+    "e2e:setup": "node e2e/setup.mjs"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.9",
+    "@seerah/content": "workspace:*",
+    "@seerah/db": "workspace:*",
+    "drizzle-orm": "^0.45.3",
+    "maplibre-gl": "^6.13.0",
+    "next": "16.3.8",
+    "pmtiles": "^4.5.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261008.1",
+    "@playwright/test": "^1.63.0",
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.148.0"
+  }
+}

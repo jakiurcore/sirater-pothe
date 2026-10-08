@@ -17,14 +17,18 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // Matches a name not already followed (optionally after whitespace / bracket) by ﷺ or ﷺ-equivalents.
 // Not matched when already followed by ﷺ (or a common abbreviation), nor when the name is part of another
 // person's name ("Muhammad ibn Ishaq", "মুহাম্মদ ইবনে ইসহাক").
+// Bangla inflects names with suffixes (নবীজির, নবীজিকে, মুহাম্মাদকে): the name is matched together with the rest of
+// its Bengali-script word, and ﷺ goes after that whole word ("নবীজির ﷺ"). The `(?![\u0980-\u09FF])` after the
+// suffix stops the regex backtracking to a shorter match inside the word, which would split it ("নবীজি ﷺর").
+const BN_WORD = '[\\u0980-\\u09FF]'
 const NAME_RE = new RegExp(
-  `(?<!(?:ibn|bin|ইবনে|ইবন|বিন)\\s)(${ALL.map(escape).join('|')})(?!\\s*(?:[\\(\\[]?\\s*(?:${PBUH}|সা\\.|স\\.|সাঃ|সা:|সা\\))|ibn\\s|bin\\s|ইবনে|ইবন |বিন |বিন্))`,
+  `(?<!(?:ibn|bin|ইবনে|ইবন|বিন)\\s)(${ALL.map(escape).join('|')})(${BN_WORD}*)(?!${BN_WORD})(?!\\s*(?:[\\(\\[]?\\s*(?:${PBUH}|সা\\.|স\\.|সাঃ|সা:|সা\\))|ibn\\s|bin\\s|ইবনে|ইবন |বিন |বিন্))`,
   'g',
 )
 
 /** Inserts ﷺ after the Prophet's name wherever it is missing. Idempotent. */
 export function addHonorific(text: string): string {
-  return text.replace(NAME_RE, `$1 ${PBUH}`)
+  return text.replace(NAME_RE, `$1$2 ${PBUH}`)
 }
 
 /** Returns true if the text mentions the Prophet by name without ﷺ. */

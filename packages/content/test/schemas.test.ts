@@ -91,6 +91,16 @@ describe('honorific', () => {
       expect(addHonorific(t), t).toBe(t)
     expect(addHonorific('Muhammad ibn Maslamah met Muhammad')).toBe('Muhammad ibn Maslamah met Muhammad ﷺ')
   })
+  it('handles Bangla inflection: ﷺ goes after the whole inflected word, never inside it', () => {
+    expect(addHonorific('নবীজির জন্ম')).toBe('নবীজির ﷺ জন্ম')
+    expect(addHonorific('নবীজিকে দেখলেন')).toBe('নবীজিকে ﷺ দেখলেন')
+    expect(addHonorific('মুহাম্মাদের কথা')).toBe('মুহাম্মাদের ﷺ কথা')
+    for (const t of ['নবীজির ﷺ জন্ম', 'নবীজিকে ﷺ দেখলেন', 'নবীজির (সা.) জন্ম', 'রাসূলুল্লাহর ﷺ নির্দেশ'])
+      expect(addHonorific(t), t).toBe(t)
+    expect(missingHonorific('নবীজির ﷺ জন্ম')).toBe(false)
+    expect(missingHonorific('নবীজির জন্ম')).toBe(true)
+    expect(addHonorific('মুহাম্মদ ইবনে মাসলামার কথা')).toBe('মুহাম্মদ ইবনে মাসলামার কথা')
+  })
   it('detects missing', () => {
     expect(missingHonorific('Muhammad spoke')).toBe(true)
     expect(missingHonorific('Muhammad ﷺ spoke')).toBe(false)

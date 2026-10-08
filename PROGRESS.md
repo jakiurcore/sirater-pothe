@@ -2,7 +2,8 @@
 
 ## ⛔ LAUNCH BLOCKERS
 1. **Bangla translation licence** (`bn.bengali`, Muhiuddin Khan via Tanzil) is unverified. Kept for development only. Before production: confirm permission in writing, or swap the dataset (`packages/content/data/translation-bn.json` + `datasets.json`). Never ship with `license` still starting `UNVERIFIED`.
-2. Seed content and gazetteer coordinates are `needs owner verification` / `verified:false`; owner verifies via MCP.
+2. Seed content and gazetteer coordinates are `needs owner verification` / `verified:false`; owner verifies via MCP. Seed event texts come from the design mock-up (not checked against sources); the production seed has **no citations and no page numbers** (none are invented), so publishing is blocked until the owner adds them. The dev seed (`seed:sql --dev`) publishes them with `(dev placeholder)` citations — LOCAL ONLY, never run against production.
+3. Surah names are not shown yet (captions read "কুরআন ১০৫:১"): a 114-name table in Bangla needs owner-verified spelling before it goes in.
 
 ## Phase 1 — Monorepo, DB schema, Zod, Qur'an dataset ✅ (2026-10-08)
 
@@ -45,3 +46,31 @@ Decisions
 
 Not yet verified (needs real credentials, Phase 6): the interactive GitHub login + consent flow end to end.
 Local note: port 8787 is used by another app on this machine; use `wrangler dev --port 8799 --var MCP_ORIGIN:http://localhost:8799`.
+
+
+## Phase 3 — Website ✅ (2026-10-08)
+
+Built `apps/web` (Next 16.3.8 via @opennextjs/cloudflare 1.20.9) from `/design`: home (hero, continue card, era list), timeline (mobile list; desktop split with the list as the left column), event detail (map with fly-to and animated route, meta, certainty badge, ayat Arabic + Bangla with translation source, summary/key points/lessons/hadith/sources, notes, mark-as-read, prev/next), light/dark, reduced motion, logical properties (RTL-ready). Real data from D1 on every request (no rebuild needed after MCP publishes).
+Routes: `/[lang]` · `/[lang]/timeline` · `/[lang]/events/[slug]` · `/[lang]/preview/[slug]?token=` · `/[lang]/review|progress` (placeholders until phase 4) · `/[lang]/sitemap.xml` + `/sitemap.xml` index · `/robots.txt` · `/tiles/arabia.pmtiles` (R2, Range) · OG image per event.
+Seed: `pnpm --filter @seerah/db seed:sql [--dev]` generates 5 eras, the 20-place gazetteer, 7 approximate routes and 5 sample events (see launch blockers). `pnpm --filter @seerah/web db:local` loads migrations + dev seed + tiles into local D1/R2.
+
+Verification
+- Unit: 60 content (incl. new Bangla-inflection honorific tests) + 4 db + 24 mcp + 10 web.
+- Playwright e2e (28 = 14 × mobile/desktop) passes against `next dev` AND against the production OpenNext build running in workerd (`opennextjs-cloudflare preview`): reading flow, persistence of read state and notes, resume, theme, timeline, draft invisible (URL, list, sitemap), preview-token rules (valid / expired / other event's token / garbage / missing), SEO, tile Range requests, 404s.
+- Visual check against the design with screenshots (mobile 390, desktop 1280, dark).
+- Worker size: 2.36 MiB gzip (limit 3 MiB free / 10 MiB paid).
+
+Decisions and findings
+- **Bug found and fixed (phase 1 code):** the honorific inserted ﷺ inside inflected Bangla words ("নবীজি ﷺর", doubled with an existing mark). Now the name is matched with the rest of its Bengali word, ﷺ goes after the word; tests added.
+- Next 16.4.0 does not work with OpenNext 1.20.9 (`Unexpected loadManifest(preview-props.json)`); pinned Next 16.3.8. Revisit when OpenNext supports 16.4.
+- The map is MapLibre + Protomaps PMTiles (34 MB, zoom 0–10, bbox 34,12,60,33) on R2, styled with the design palette; labels are HTML markers so Bangla uses the page fonts. `scripts/build-tiles.sh` rebuilds the file; upload command is in the script header. MapLibre 6's module worker is not bundled correctly by Turbopack, so `scripts/copy-maplibre.mjs` serves it from `public/vendor` (runs in predev/prebuild).
+- Map markers are the event's place plus gazetteer places lying on its route (e.g. Thawr on the Hijrah path). Route line is smoothed (Catmull-Rom, like the design) and drawn progressively; the `isra` route is dotted.
+- Pages render dynamically (D1 each request) with no ISR cache; tiles are cached hard. Add `Cache-Control` at the edge in phase 5 if load requires.
+- Reader state (read, notes, last event) lives behind a `Backend` interface in `lib/store.ts` (localStorage with try/catch + in-memory fallback, cross-tab sync); swap the backend when accounts arrive. The UI says so when storage is unavailable.
+- Preview: token hash lookup (SHA-256), expiry and event binding checked before any draft is loaded; every failure renders the same message; `noindex`, `no-referrer`.
+- Event translations in other languages fall back to Bangla with a notice; a language only lists events that have a published translation (or Bangla).
+- **OG images are Latin-only.** Satori (next/og) can neither shape Bengali nor parse Hind Siliguri/Amiri GSUB tables (`lookupType: 5 - substFormat: 3`), so the card shows "Seerah Timeline", era number and years; the Bangla title is in og:title/description. A proper Bangla card needs a different renderer (e.g. resvg with HarfBuzz shaping in a separate Worker).
+- Design deviations: 3D terrain toggle is shown disabled ("শীঘ্রই") exactly as in the design; mobile uses a tab bar, desktop a top bar. Language menu lists only languages that have UI catalogues (Bangla only until phase 4).
+- Not done in this phase on purpose: review (spaced repetition) and progress screens (phase 4), real i18n catalogues beyond Bangla (phase 4), CI and deploy (phase 5).
+
+Local run: `pnpm --filter @seerah/web db:local` then `pnpm --filter @seerah/web dev` (port 3000) or `... preview`. If `3000` is taken use `next dev -p 3100`.

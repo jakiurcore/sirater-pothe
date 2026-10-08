@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "seerah-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "observability": { "enabled": true },
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "seerah-web" }],
+  // Routes/custom domains are NOT hardcoded: scripts/render-wrangler.mjs (phase 5) injects $DOMAIN from the environment.
+  "vars": {
+    "WEB_ORIGIN": "http://localhost:3000"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "seerah",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+  // Map tiles (Protomaps PMTiles for the Arabian Peninsula), served by /tiles/arabia.pmtiles with Range support.
+  "r2_buckets": [{ "binding": "TILES", "bucket_name": "seerah-tiles" }]
+}
