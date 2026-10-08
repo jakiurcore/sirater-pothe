@@ -29,15 +29,19 @@ Open questions for the owner
 2. Gazetteer coordinates are approximate (hudaybiyyah, hunayn, abwa especially); all flagged `verified: false`.
 3. Is a Bangla ayah translation required at all in v1, or Arabic-only until licensing is settled?
 
-## Phase 2 — MCP server ⏳ IN PROGRESS (usage limit hit mid-phase)
+## Phase 2 — MCP server ✅ (2026-10-08)
 
-Written, typechecked (not yet tested/run): `apps/mcp/src/*` — OAuthProvider (GitHub login, consent page, allow-list, live role resolution), API tokens (`resolveExternalToken`, hashed in D1), 35 tools (read, event write, place/route, ayah/hadith/source/recall, media, revisions/revert, tokens, publish gate), resources (guidelines, schema, outline), prompt `add_event_from_my_notes`, revision + audit system.
+Built (`apps/mcp`): OAuth 2.1 provider (GitHub upstream login, consent page, `ALLOWED_GITHUB_USERS`, live role resolution via `OWNER_GITHUB_USERS`), API tokens (hashed, capped at creator's role, revocable), 29 tools, 3 resources (content-guidelines, schema, timeline outline), prompt `add_event_from_my_notes`, revisions with revert, audit log of every write/failed call.
+
+Tests: 24 integration tests in workerd (real D1/R2/KV via `@cloudflare/vitest-plugin`) calling the Worker over HTTP with bearer tokens: auth (401/403), draft→publish gate (source required, needs_verification gate), disputed note, ayah by reference only (client text rejected, bad ranges), hadith ref-only, editor restrictions, token hash-only storage + revoke, preview token hashing, bbox/[lng,lat] checks, media kind/svg/sniffing rejection, ordering, partial translation update, publish→revert→re-revert refusal, audit log, resources/prompt.
+MCP Inspector (official CLI) against `wrangler dev`: tools/list (29), tools/call, resources/list, prompts/list, error text all OK; OAuth discovery docs (`/.well-known/oauth-protected-resource/mcp`) correct.
 
 Decisions
-- Used stateless `createMcpHandler` (MCP SDK 2.0.0), NOT `McpAgent`: current docs mark McpAgent deprecated/feature-frozen.
-- `@cloudflare/vitest-pool-workers` is deprecated → `@cloudflare/vitest-plugin` (needs vitest 4.x in apps/mcp).
-- OAuthProvider is built lazily on first request so MCP_ORIGIN comes from env.
-- Added tools beyond spec: `verify_place`, `list_api_tokens`. Seed events need `confirm_verified` to publish.
-- Image "no people" rule is enforced by kind tag + attestation + content sniffing; code cannot detect faces. Owner must still eyeball uploads.
+- Stateless `createMcpHandler` (MCP SDK 2.0.0), not deprecated `McpAgent`. `@cloudflare/vitest-plugin` replaces deprecated pool-workers (needs vitest 4 in apps/mcp).
+- OAuthProvider built lazily so origins come from env. Hostnames validated by `allowedHostnames`.
+- Extra tools: `verify_place`, `list_api_tokens`. Editors cannot publish/unpublish/verify and can only edit drafts.
+- Image "no people" rule = kind tag + attestation + magic-byte sniffing (PNG/JPEG/WebP/AVIF; SVG refused). Code cannot detect faces; owner must eyeball uploads.
+- Revisions: `before` snapshot is atomic with the change; `after` is filled right after (informational). Revert of a creation deletes the draft only; places/routes/sources can't be un-created.
 
-TODO to finish Phase 2: write Vitest tests (workers pool: tools, role gates, revert, publish gate, token auth, Qur'an-text rejection; check SDK's invalid-input error message is clear and that Zod transforms convert to JSON Schema in tools/list); run MCP Inspector against `wrangler dev` with an API token; fix findings.
+Not yet verified (needs real credentials, Phase 6): the interactive GitHub login + consent flow end to end.
+Local note: port 8787 is used by another app on this machine; use `wrangler dev --port 8799 --var MCP_ORIGIN:http://localhost:8799`.
