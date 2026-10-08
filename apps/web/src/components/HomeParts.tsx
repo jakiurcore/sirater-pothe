@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { useFmt, useTimeline } from './Providers'
+import { useDue, useFmt, useTimeline } from './Providers'
 import { useReader } from '@/lib/store'
 import { hijriLabel, gregLabel } from '@/lib/i18n'
 
@@ -26,7 +26,7 @@ export function ContinueCard() {
           <span className="sm">{[hijriLabel(f, target.hijriYear), gregLabel(f, target.gregorianApprox), target.place].filter(Boolean).join(' · ')}</span>
         </div>
         <div className="prog">
-          <div className="row"><span>{f.t('home.readCount', { n: `${f.n(read)} / ${f.n(events.length)}` })}</span><b>{f.n(pct)}%</b></div>
+          <div className="row"><span>{f.t('home.readCount', { n: `${f.n(read)} / ${f.n(events.length)}` })}</span><b>{f.pct(pct)}</b></div>
           <div className="bar"><i style={{ width: `${pct}%` }} /></div>
         </div>
         <Link href={`/${f.lang}/events/${target.slug}`} className="btn">{started ? f.t('home.continue') : f.t('home.startFrom')}<span aria-hidden="true">›</span></Link>
@@ -78,7 +78,7 @@ export function AsideHead() {
   return (
     <div className="aside-head">
       <h2>{f.t('timeline.title')}</h2>
-      <div className="pr"><div className="bar"><i style={{ width: `${pct}%` }} /></div><span>{f.n(pct)}%</span></div>
+      <div className="pr"><div className="bar"><i style={{ width: `${pct}%` }} /></div><span>{f.pct(pct)}</span></div>
       <span>{f.t('home.readCount', { n: `${f.n(read)} / ${f.n(events.length)}` })}</span>
     </div>
   )
@@ -92,3 +92,21 @@ export function TimelineSub() {
   return <span>{f.t('timeline.sub', { read: f.n(read), total: f.n(events.length) })}</span>
 }
 
+
+/** Gold line on the home screen: how many review questions are waiting (links to the review). */
+export function DueLine() {
+  const f = useFmt()
+  const { due, eligible, doneToday } = useDue()
+  if (!eligible) return null
+  const text = due > 0 ? f.t('home.due', { n: due }) : doneToday ? f.t('home.dueDone') : null
+  if (!text) return null
+  return (
+    <section className="sect">
+      <Link href={`/${f.lang}/review`} className="dueline">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8M3 3v5h5M12 8v4l3 2" /></svg>
+        <span className="x">{text}</span>
+        <span aria-hidden="true">›</span>
+      </Link>
+    </section>
+  )
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { isLang, getMessages, makeFmt, uiLangs } from '@/lib/i18n'
-import { ContinueCard, EraCards } from '@/components/HomeParts'
+import { ContinueCard, DueLine, EraCards } from '@/components/HomeParts'
 import { LangMenu, ThemeToggle } from '@/components/Chrome'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +33,7 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
         <p>{f.t('home.lead')}</p>
       </section>
       <ContinueCard />
+      <DueLine />
       <EraCards />
     </main>
   )

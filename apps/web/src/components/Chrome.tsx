@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useFmt } from './Providers'
+import { useDue, useFmt } from './Providers'
 import { Icon, GlobeIcon, SunIcon, PATHS } from './icons'
 import { SUPPORTED_LANGS, type Lang } from '@/lib/i18n'
 import { THEME_KEY } from '@/lib/theme'
@@ -22,8 +22,9 @@ function useActiveTab(): Tab {
   return 'home'
 }
 
-export function TabBar({ due = 0 }: { due?: number }) {
+export function TabBar() {
   const f = useFmt()
+  const { due } = useDue()
   const active = useActiveTab()
   return (
     <nav className="tabbar mob-only" aria-label={f.t('nav.main')}>
@@ -40,8 +41,9 @@ export function TabBar({ due = 0 }: { due?: number }) {
   )
 }
 
-export function DeskNav({ due = 0 }: { due?: number }) {
+export function DeskNav() {
   const f = useFmt()
+  const { due } = useDue()
   const active = useActiveTab()
   return (
     <nav aria-label={f.t('nav.main')}>
@@ -72,6 +74,11 @@ export function ThemeToggle() {
   )
 }
 
+/** Remember the choice so "/" opens in this language next time. */
+function remember(l: Lang) {
+  try { document.cookie = `seerah-lang=${l}; path=/; max-age=31536000; samesite=lax` } catch { /* cookies blocked */ }
+}
+
 export function LangMenu({ langs }: { langs: Lang[] }) {
   const f = useFmt()
   const pathname = usePathname() ?? `/${f.lang}`
@@ -86,7 +93,7 @@ export function LangMenu({ langs }: { langs: Lang[] }) {
       <ul>
         {langs.map((l) => (
           <li key={l}>
-            <Link href={`/${l}${rest ? `/${rest}` : ''}`} hrefLang={l} lang={l} aria-current={l === f.lang ? 'true' : undefined}>{SUPPORTED_LANGS[l].name}</Link>
+            <Link href={`/${l}${rest ? `/${rest}` : ''}`} hrefLang={l} lang={l} aria-current={l === f.lang ? 'true' : undefined} onClick={() => remember(l)}>{SUPPORTED_LANGS[l].name}</Link>
           </li>
         ))}
       </ul>

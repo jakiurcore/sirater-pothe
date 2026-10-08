@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeFmt, getMessages, hijriLabel, gregLabel, ageLabel, isLang } from '@/lib/i18n'
 import { smooth, boundsFor, PENINSULA } from '@/lib/map'
-import { createStore, type Backend, type ReaderState } from '@/lib/store'
+import { createStore, EMPTY_STATE, type Backend, type ReaderState } from '@/lib/store'
 import type { MapData } from '@/lib/content'
 
 const f = makeFmt('bn', getMessages('bn'))
@@ -59,7 +59,7 @@ describe('reader store', () => {
     const saved: ReaderState[] = []
     return {
       saved,
-      load: () => opts.initial ?? { read: {}, notes: {}, last: null },
+      load: () => opts.initial ?? EMPTY_STATE,
       save: (s) => { if (opts.failSave) return false; saved.push(s); return true },
     }
   }
@@ -96,7 +96,7 @@ describe('reader store', () => {
     expect(st.getSnapshot().notes.e1?.text).toBe('draft')
   })
   it('the server snapshot is empty and constant', () => {
-    const st = createStore(memory({ initial: { read: { a: 'x' }, notes: {}, last: 'a' } }))
+    const st = createStore(memory({ initial: { ...EMPTY_STATE, read: { a: 'x' }, last: 'a' } }))
     expect(st.getServerSnapshot()).toBe(st.getServerSnapshot())
     expect(st.getServerSnapshot().read).toEqual({})
   })

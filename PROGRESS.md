@@ -4,6 +4,7 @@
 1. **Bangla translation licence** (`bn.bengali`, Muhiuddin Khan via Tanzil) is unverified. Kept for development only. Before production: confirm permission in writing, or swap the dataset (`packages/content/data/translation-bn.json` + `datasets.json`). Never ship with `license` still starting `UNVERIFIED`.
 2. Seed content and gazetteer coordinates are `needs owner verification` / `verified:false`; owner verifies via MCP. Seed event texts come from the design mock-up (not checked against sources); the production seed has **no citations and no page numbers** (none are invented), so publishing is blocked until the owner adds them. The dev seed (`seed:sql --dev`) publishes them with `(dev placeholder)` citations — LOCAL ONLY, never run against production.
 3. Surah names are not shown yet (captions read "কুরআন ১০৫:১"): a 114-name table in Bangla needs owner-verified spelling before it goes in.
+4. English and Arabic UI strings (`apps/web/src/messages/en.json`, `ar.json`) were written by the assistant: have a native speaker review them before launch.
 
 ## Phase 1 — Monorepo, DB schema, Zod, Qur'an dataset ✅ (2026-10-08)
 
@@ -74,3 +75,26 @@ Decisions and findings
 - Not done in this phase on purpose: review (spaced repetition) and progress screens (phase 4), real i18n catalogues beyond Bangla (phase 4), CI and deploy (phase 5).
 
 Local run: `pnpm --filter @seerah/web db:local` then `pnpm --filter @seerah/web dev` (port 3000) or `... preview`. If `3000` is taken use `next dev -p 3100`.
+
+
+## Phase 4 — Progress, notes, recall review, i18n ✅ (2026-10-08)
+
+Built
+- **Review (spaced repetition)** at `/[lang]/review`: questions come from the MCP-created `recall_questions` of events the reader has marked read. Wrong answer → tomorrow. Right answer → reader rates Hard / Remembered / Very easy and the next date follows (new card 2/5/12 days, then SM-2-style growth, ease ≥ 1.3, cap 365 days). Button labels are computed by the same function that schedules. Options are shuffled with a stable seed. The queue is fixed when a session starts. A day counts for the streak when a session is completed. Due badge on the tab bar / desktop nav, gold banner on home, done / nothing-due / nothing-yet states.
+- **Progress** at `/[lang]/progress`: ring, events and eras done, 7-day streak strip, per-era bars, notes list (newest first, links to the event), and **backup export / import** (JSON, validated like stored data) because everything lives in one browser.
+- **Reader store** now also holds SRS cards and review days; every stored value is validated on load (malformed entries are dropped, never trusted). Same `Backend` seam for future accounts.
+- **i18n plumbing:** catalogues `bn` (source), `en`, `ar` in `src/messages`; fallback chain requested → en → bn; ICU-style plurals (`{n, plural, one{…} other{…}}`, all six Arabic categories via `Intl.PluralRules`); numbers and percents formatted per locale (Bengali / Arabic-Indic digits); `dir` from the language, layout uses logical properties (verified mirrored in Arabic, no overflow); `/` negotiates language (remembered choice cookie → Accept-Language → Bangla); language menu keeps you on the same page and remembers the choice; sitemaps list only real translations per language and hreflang only real translations; pages that fall back to Bangla text carry a notice, `lang="bn"` on the article, and `noindex`. To add a language: add `src/messages/<code>.json` with the same keys and register it in `lib/i18n.ts` (a test enforces key and placeholder parity and that the Prophet is never named without ﷺ).
+
+Verification
+- Unit: 60 content + 4 db + 24 mcp + 29 web (SRS maths incl. month/leap/DST day handling, due list, streak, shuffle, state validation, catalogue parity, plurals, negotiation).
+- Playwright e2e **52 passing on both `next dev` and the production OpenNext build in workerd**: review flows (nothing yet, due → badge/banner/review, wrong answer, right answer + rating dates and streak, multi-question session), progress (ring, notes, backup export → clear → import round-trip, bad backups rejected), English and Arabic UI (lang/dir, plural, digits, RTL mirroring, fallback notice + noindex), language negotiation, language menu keeps the theme, sitemaps.
+- Visual check against the design (review, progress, Arabic RTL).
+
+Decisions and findings
+- **Bug found and fixed:** switching language re-created `<html>` and dropped `data-theme` (dark mode reset). `ThemeSync` re-applies the stored theme after every language change; e2e covers it.
+- UI strings that name the Prophet follow the ﷺ rule too (the hero line reads "… রাসূল ﷺ"); the test scans every catalogue with `missingHonorific`.
+- Qur'an *translations* from the dataset are shown verbatim (Tanzil's licence forbids changing them), so a translation that names the Prophet is not given an inserted ﷺ; the Arabic is never touched either.
+- Review questions have no explanation text or "type" tag (the design mock-up had both): the data model has only question / answer / distractors. The feedback shows the correct answer and a link to the event. If you want explanations, add a `why` field (migration + MCP tool) in a later phase.
+- Arabic and English UI strings were written by me and need a native-speaker read before launch (added to launch blockers). Other languages in `SUPPORTED_LANGS` have no UI catalogue yet and fall back to English.
+- Mobile keeps the design's placement of the language menu and theme toggle (home screen only); desktop has them in the top bar on every page.
+- The theme init script now uses `next/script` (beforeInteractive). React still logs a dev-only "script tag" warning when the language switch re-renders the root layout; harmless in production.

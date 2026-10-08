@@ -18,7 +18,9 @@ export async function generateMetadata({ params }: P): Promise<Metadata> {
   return {
     title: page.card.title,
     description: `${hijriLabel(f, page.card.hijriYear)} · ${gregLabel(f, page.card.gregorianApprox)} — ${desc}`,
-    alternates: { canonical: url, languages: Object.fromEntries(uiLangs().map((l) => [l, `/${l}/events/${slug}`])) },
+    // Pages that fall back to another language's text are not indexed; hreflang lists only real translations.
+    robots: page.textLang === lang ? undefined : { index: false, follow: true },
+    alternates: { canonical: url, languages: Object.fromEntries(page.translatedLangs.filter((l) => uiLangs().includes(l as never)).map((l) => [l, `/${l}/events/${slug}`])) },
     openGraph: { type: 'article', title: page.card.title, description: desc, url, locale: lang },
     twitter: { card: 'summary_large_image' },
   }

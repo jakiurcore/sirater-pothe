@@ -5,6 +5,7 @@
  * touches localStorage for reader data.
  */
 import { useSyncExternalStore } from 'react'
+import type { Card } from './srs'
 
 export interface ReaderState {
   /** event id → ISO time it was marked read */
@@ -13,8 +14,12 @@ export interface ReaderState {
   notes: Record<string, { text: string; updatedAt: string }>
   /** event id of the last event opened */
   last: string | null
+  /** recall question id → spaced-repetition card */
+  srs: Record<string, Card>
+  /** local days ("YYYY-MM-DD") on which a review session was completed */
+  reviewDays: string[]
 }
-export const EMPTY_STATE: ReaderState = Object.freeze({ read: {}, notes: {}, last: null }) as ReaderState
+export const EMPTY_STATE: ReaderState = Object.freeze({ read: {}, notes: {}, last: null, srs: {}, reviewDays: [] }) as ReaderState
 
 export interface Backend {
   load(): ReaderState
@@ -31,11 +36,20 @@ function sanitize(raw: unknown): ReaderState {
   for (const [k, v] of Object.entries(o.read ?? {})) if (typeof v === 'string') read[k] = v
   const notes: ReaderState['notes'] = {}
   for (const [k, v] of Object.entries(o.notes ?? {})) if (v && typeof v.text === 'string') notes[k] = { text: v.text, updatedAt: String(v.updatedAt ?? '') }
-  return { read, notes, last: typeof o.last === 'string' ? o.last : null }
+  const srs: ReaderState['srs'] = {}
+  for (const [k, v] of Object.entries(o.srs ?? {})) {
+    const c = v as Partial<Card> | null
+    if (c && typeof c.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.due) && Number.isFinite(c.interval) && Number.isFinite(c.ease))
+      srs[k] = { due: c.due, interval: c.interval!, ease: c.ease!, reps: Number(c.reps) || 0, lapses: Number(c.lapses) || 0 }
+  }
+  const reviewDays = Array.isArray(o.reviewDays) ? [...new Set(o.reviewDays.filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort().slice(-400) : []
+  return { read, notes, last: typeof o.last === 'string' ? o.last : null, srs, reviewDays }
 }
 
+export const parseReaderState = (raw: unknown): ReaderState => sanitize(raw)
+
 export function localStorageBackend(): Backend {
-  let memory: ReaderState = { read: {}, notes: {}, last: null }
+  let memory: ReaderState = EMPTY_STATE
   return {
     load() {
       try {
@@ -93,6 +107,19 @@ export function createStore(backend: Backend) {
       if (text.trim()) notes[id] = { text, updatedAt: new Date().toISOString() }
       else delete notes[id]
       commit({ ...state, notes })
+    },
+    setCard(questionId: string, card: Card) {
+      ensure()
+      commit({ ...state, srs: { ...state.srs, [questionId]: card } })
+    },
+    markReviewDay(day: string) {
+      ensure()
+      if (!state.reviewDays.includes(day)) commit({ ...state, reviewDays: [...state.reviewDays, day].sort().slice(-400) })
+    },
+    /** Replace everything (import of a backup). Input is validated like stored data. */
+    replaceAll(raw: unknown) {
+      ensure()
+      commit(sanitize(raw))
     },
     setLast(id: string) {
       ensure()

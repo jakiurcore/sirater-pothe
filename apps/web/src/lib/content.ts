@@ -59,6 +59,8 @@ export interface EventPage {
   map: MapData
   /** Language the text is actually in (differs from the requested one when falling back). */
   textLang: string
+  /** Languages with a published translation of this event (for hreflang). */
+  translatedLangs: string[]
   index: number
   total: number
   prev: EventCard | null
@@ -209,6 +211,7 @@ export async function getEventPage({ slug, lang, preview = false }: EventLookup)
     }),
     map: { eventId: e.id, markers, route, label: markers.map((m) => m.name).join('، ') },
     textLang: t.lang,
+    translatedLangs: trAll.filter((x) => x.status === 'published').map((x) => x.lang),
     index: index + 1,
     total: flat.length + (inList ? 0 : 1),
     prev,
@@ -245,8 +248,49 @@ export async function verifyPreviewToken(slug: string, token: string | undefined
 
 // ───────── sitemap ─────────
 export async function listPublishedSlugs(): Promise<{ slug: string; updatedAt: string; langs: string[] }[]> {
+  // `langs` = languages with a published translation of the event
   const db = await getDatabase()
   const rows = await db.select().from(s.events).where(eq(s.events.status, 'published')).orderBy(asc(s.events.orderIndex))
   const tr = rows.length ? await db.select({ id: s.eventTranslations.eventId, lang: s.eventTranslations.lang }).from(s.eventTranslations).where(and(inArray(s.eventTranslations.eventId, rows.map((r) => r.id)), eq(s.eventTranslations.status, 'published'))) : []
   return rows.map((r) => ({ slug: r.slug, updatedAt: r.updatedAt, langs: tr.filter((t) => t.id === r.id).map((t) => t.lang) }))
+}
+
+// ───────── recall questions ─────────
+export interface RecallIndexItem { id: string; eventId: string }
+export interface RecallQuestion extends RecallIndexItem {
+  eventSlug: string
+  eventTitle: string
+  question: string
+  answer: string
+  distractors: string[]
+  lang: string
+}
+
+async function publishedQuestions(lang: Lang) {
+  const db = await getDatabase()
+  const timeline = await getTimeline(lang)
+  const ids = timeline.events.map((e) => e.id)
+  if (!ids.length) return { timeline, qs: [] as (typeof s.recallQuestions.$inferSelect)[], tr: [] as (typeof s.recallQuestionTranslations.$inferSelect)[] }
+  const qs = await db.select().from(s.recallQuestions).where(inArray(s.recallQuestions.eventId, ids)).orderBy(asc(s.recallQuestions.orderIndex))
+  const tr = qs.length ? await db.select().from(s.recallQuestionTranslations).where(inArray(s.recallQuestionTranslations.questionId, qs.map((q) => q.id))) : []
+  return { timeline, qs, tr }
+}
+
+/** Ids only: small enough to ship on every page so the "due" badge can be computed in the browser. */
+export const getRecallIndex = cache(async (lang: Lang): Promise<RecallIndexItem[]> => {
+  const { qs, tr } = await publishedQuestions(lang)
+  return qs.filter((q) => tr.some((t) => t.questionId === q.id && (t.lang === lang || t.lang === DEFAULT_LANG))).map((q) => ({ id: q.id, eventId: q.eventId }))
+})
+
+/** Full questions for the review screen (requested language, else the default one). Events must be published. */
+export async function getRecallQuestions(lang: Lang): Promise<RecallQuestion[]> {
+  const { timeline, qs, tr } = await publishedQuestions(lang)
+  const byId = new Map(timeline.events.map((e) => [e.id, e]))
+  const out: RecallQuestion[] = []
+  for (const q of qs) {
+    const t = pick(tr.filter((x) => x.questionId === q.id), lang, true)
+    const ev = byId.get(q.eventId)
+    if (t && ev) out.push({ id: q.id, eventId: q.eventId, eventSlug: ev.slug, eventTitle: ev.title, question: hon(t.question), answer: hon(t.answer), distractors: t.distractors.map(hon), lang: t.lang })
+  }
+  return out
 }

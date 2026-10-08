@@ -2,12 +2,14 @@ import type { Metadata, Viewport } from 'next'
 import { notFound } from 'next/navigation'
 import { Hind_Siliguri, Noto_Serif_Bengali, Amiri } from 'next/font/google'
 import Link from 'next/link'
+import Script from 'next/script'
 import '@/styles/tokens.css'
 import '@/styles/app.css'
 import { Providers } from '@/components/Providers'
+import { ThemeSync } from '@/components/ThemeSync'
 import { DeskNav, LangMenu, TabBar, ThemeToggle } from '@/components/Chrome'
 import { dirOf, getMessages, isLang, makeFmt, uiLangs } from '@/lib/i18n'
-import { getTimeline } from '@/lib/content'
+import { getRecallIndex, getTimeline } from '@/lib/content'
 import { THEME_SCRIPT } from '@/lib/theme'
 
 const hind = Hind_Siliguri({ subsets: ['bengali', 'latin'], weight: ['400', '500', '600', '700'], display: 'swap', variable: '--font-hind' })
@@ -41,16 +43,17 @@ export default async function LangLayout({ children, params }: { children: React
   if (!isLang(lang)) notFound()
   const messages = getMessages(lang)
   const f = makeFmt(lang, messages)
-  const timeline = await getTimeline(lang)
+  const [timeline, recall] = await Promise.all([getTimeline(lang), getRecallIndex(lang)])
   const langs = uiLangs()
   return (
     <html lang={lang} dir={dirOf(lang)} className={`${hind.variable} ${notoSerif.variable} ${amiri.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         {langs.map((l) => <link key={l} rel="alternate" hrefLang={l} href={`/${l}`} />)}
       </head>
       <body>
-        <Providers lang={lang} messages={messages} timeline={timeline}>
+        <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <Providers lang={lang} messages={messages} timeline={timeline} recall={recall}>
+          <ThemeSync />
           <div className="app">
             <a className="skip" href="#main">{f.t('nav.skip')}</a>
             <header className="deskbar desk-only">
