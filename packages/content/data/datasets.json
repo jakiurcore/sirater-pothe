@@ -1,0 +1,19 @@
+{
+  "arabic": {
+    "id": "tanzil-uthmani-1.1",
+    "name": "Tanzil Quran Text (Uthmani) v1.1",
+    "license": "CC-BY-3.0 (verbatim copies only; attribute Tanzil Project, link to tanzil.net)",
+    "url": "https://tanzil.net",
+    "notes": "Bismillah prefix removed from ayah 1 of surahs 2-8 and 10-114 (Tanzil export prepends it); all other text is verbatim.",
+    "sha256_source": "bf4f57b968d03f4131c070b1e285da9be0e0a108a21c910e872801ca273312c8",
+    "ayat": 6236
+  },
+  "bn": {
+    "id": "tanzil-bn.bengali",
+    "name": "Muhiuddin Khan (bn.bengali) via Tanzil",
+    "license": "UNVERIFIED: translation copyright is held by the translator/publisher; Tanzil distributes it for display with attribution. Owner must verify before commercial/public use.",
+    "url": "https://tanzil.net/trans/",
+    "sha256_source": "175697eaa9b0106bb96ecb388ff145f02a9bceb82e70e2ec879cc227b8bc0a1a",
+    "ayat": 6236
+  }
+}

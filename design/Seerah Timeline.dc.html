@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js" integrity="sha384-Ukv1p/xTma6P4/2bY5KzWBw+ydSpXmhCMtyciIQVDJ1RmOxtCYNMF1uXT9T63H67" crossorigin="anonymous"></script>
+<style>
+body{margin:0;background:#E6E0D4;font-family:'Hind Siliguri',system-ui,sans-serif}
+:root,[data-theme="light"]{--f-ui:'Hind Siliguri','Amiri',sans-serif;--f-read:'Noto Serif Bengali','Amiri',serif;--f-ar:'Amiri','Noto Naskh Arabic',serif;--bg:#F3EBDD;--surface:#FAF6EE;--surface-2:#ECE2CF;--ink:#1E1A16;--ink-2:#5B5047;--ink-3:#8A7D6C;--line:#DCCFB8;--primary:#2E6A61;--primary-strong:#22514A;--primary-tint:#DCE7DF;--on-primary:#FAF6EE;--gold:#B48A3C;--gold-ink:#755819;--gold-tint:#F1E3C2;--wrong:#9A4B3A;--wrong-tint:#F3DFD6;--map-sea:#DDE3DA;--map-land:#F0E6D2;--map-coast:#B7A687;--map-grid:rgba(46,106,97,.10);--map-halo:#F0E6D2;--map-marker:#2E6A61;--map-route:#2E6A61;--map-sea-ink:#6E7F78;--pattern-op:.10;--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%232E6A61' stroke-width='1'%3E%3Crect x='14' y='14' width='20' height='20'/%3E%3Crect x='14' y='14' width='20' height='20' transform='rotate(45 24 24)'/%3E%3Cpath d='M0 0l14 14M48 0L34 14M0 48l14-14M48 48L34 34M24 0v10M24 38v10M0 24h10M38 24h10'/%3E%3C/g%3E%3C/svg%3E");color-scheme:light}
+[data-theme="dark"]{--bg:#0D1524;--surface:#142035;--surface-2:#1A2841;--ink:#EEE5D1;--ink-2:#B8AD98;--ink-3:#7F8AA0;--line:#27354F;--primary:#7FBFB2;--primary-strong:#A3D6CA;--primary-tint:#173537;--on-primary:#0D1524;--gold:#D6B46A;--gold-ink:#E6CB8D;--gold-tint:#332B1B;--wrong:#E6A08C;--wrong-tint:#3A2323;--map-sea:#0B1322;--map-land:#1A2740;--map-coast:#3B4D6E;--map-grid:rgba(127,191,178,.08);--map-halo:#1A2740;--map-marker:#7FBFB2;--map-route:#7FBFB2;--map-sea-ink:#7088A0;--pattern-op:.13;--pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%23D6B46A' stroke-width='1'%3E%3Crect x='14' y='14' width='20' height='20'/%3E%3Crect x='14' y='14' width='20' height='20' transform='rotate(45 24 24)'/%3E%3Cpath d='M0 0l14 14M48 0L34 14M0 48l14-14M48 48L34 34M24 0v10M24 38v10M0 24h10M38 24h10'/%3E%3C/g%3E%3C/svg%3E");color-scheme:dark}
+a{color:var(--primary-strong);text-underline-offset:3px}a:hover{color:var(--primary)}
+button:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+textarea:focus{outline:2px solid var(--primary);outline-offset:1px}
+textarea::placeholder{color:var(--ink-2);opacity:.75}
+@keyframes seerahPulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(2.6);opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:500 12px/1.3 'Hind Siliguri',system-ui,sans-serif;color:rgba(0,0,0,.6)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}.dv-next{margin:28px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}
+</style>
+</helmet>
+<section class="dv-turn" id="t1" data-theme="{{ theme }}">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">সীরাতের পথে · first pass: five mobile screens, dark mode, desktop split view</span></div>
+
+<div style="max-width:1180px;margin:0 0 36px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:28px;padding:24px 28px;background:#FBF9F5;border:1px solid rgba(0,0,0,.08);border-radius:10px;font:400 13px/1.6 system-ui,sans-serif;color:#3a342d;">
+<div style="display:flex;flex-direction:column;gap:10px;">
+<strong style="font-size:13px;color:#1a1a1a;">System</strong>
+<span>The attached design system is empty, so every token here comes from your brief. One teal for action, gold only for progress and highlights.</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px;">
+<span title="parchment" style="width:30px;height:30px;border-radius:6px;background:#F3EBDD;border:1px solid rgba(0,0,0,.1);"></span><span title="ink" style="width:30px;height:30px;border-radius:6px;background:#1E1A16;"></span><span title="teal" style="width:30px;height:30px;border-radius:6px;background:#2E6A61;"></span><span title="gold" style="width:30px;height:30px;border-radius:6px;background:#B48A3C;"></span>
+<span style="width:12px;"></span>
+<span title="night" style="width:30px;height:30px;border-radius:6px;background:#0D1524;"></span><span title="cream" style="width:30px;height:30px;border-radius:6px;background:#EEE5D1;border:1px solid rgba(0,0,0,.1);"></span><span title="teal (dark)" style="width:30px;height:30px;border-radius:6px;background:#7FBFB2;"></span><span title="gold (dark)" style="width:30px;height:30px;border-radius:6px;background:#D6B46A;"></span>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;">
+<strong style="font-size:13px;color:#1a1a1a;">Type scale (mobile)</strong>
+<span style="font:700 26px/1.45 'Hind Siliguri','Amiri';color:#1E1A16;">শিরোনাম ২৬–২৮ / ৭০০</span>
+<span style="font:600 20px/1.5 'Hind Siliguri';color:#1E1A16;">অংশের শিরোনাম ২০ / ৬০০</span>
+<span style="font:400 18px/1.85 'Noto Serif Bengali','Amiri';color:#1E1A16;">পাঠ্য ১৮ / ১.৮৫, নবীজি ﷺ</span>
+<span style="font:500 13px/1.6 'Hind Siliguri';color:#5B5047;">মেটা ১৩ / ৫০০ · UI ১৫–১৬ / ৫০০–৬০০</span>
+<span lang="ar" dir="rtl" style="font:400 26px/2 'Amiri';color:#1E1A16;text-align:start;">لَا تَحْزَنْ إِنَّ اللَّهَ مَعَنَا</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;">
+<strong style="font-size:13px;color:#1a1a1a;">Rules applied</strong>
+<span>No figures of any kind; imagery is limited to the map, geometric pattern and calligraphy. Pattern only appears in headers and dividers.</span>
+<span>Logical start/end properties throughout, so the layout mirrors for Arabic and Urdu. Text boxes wrap rather than truncate.</span>
+<span>Map uses real Natural Earth coastline. Routes are approximate and labelled so. Click any timeline node to fly the map and fade the reading panel.</span>
+</div>
+</div>
+
+<div class="dv-opts">
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>হোম</div>
+<div class="dv-card" data-screen-label="01 Home" style="width:390px;height:844px;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);border-radius:28px;">
+<div style="flex:1;min-height:0;overflow-y:auto;">
+<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:12px;padding-inline:20px 10px;">
+<div style="display:flex;flex-direction:column;"><span style="font:700 19px/1.3 var(--f-ui);color:var(--ink);">সীরাতের পথে</span><span lang="ar" dir="rtl" style="align-self:flex-start;font:400 13px/1.7 var(--f-ar);color:var(--ink-2);">السيرة النبوية</span></div>
+<div style="display:flex;align-items:center;gap:2px;">
+<button aria-label="ভাষা নির্বাচন" style="min-height:44px;display:flex;align-items:center;gap:6px;padding-inline:12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 14px/1 var(--f-ui);cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>বাংলা<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></button>
+<button onClick="{{ toggleTheme }}" aria-label="থিম পরিবর্তন" style="width:44px;height:44px;border-radius:50%;border:0;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer;">
+<sc-if value="{{ isLight }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13.5A8.5 8.5 0 1 1 10.5 3.5a6.5 6.5 0 0 0 10 10z"></path></svg></sc-if>
+<sc-if value="{{ isDark }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+</button>
+</div>
+</header>
+<section style="position:relative;overflow:hidden;margin-inline:16px;border-radius:20px;background:var(--surface-2);padding:26px 20px 20px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;">
+<div aria-hidden="true" style="position:absolute;inset:0;background-image:var(--pattern);background-size:44px 44px;opacity:calc(var(--pattern-op) * 1.4);-webkit-mask-image:radial-gradient(ellipse at center,transparent 30%,#000 75%);mask-image:radial-gradient(ellipse at center,transparent 30%,#000 75%);"></div>
+<p lang="ar" dir="rtl" style="position:relative;margin:0;font:700 40px/1.8 var(--f-ar);color:var(--primary-strong);">مُحَمَّدٌ رَسُولُ اللَّهِ</p>
+<span style="position:relative;font:500 13px/1.6 var(--f-ui);color:var(--ink-2);">মুহাম্মাদ আল্লাহর রাসূল · সূরা আল-ফাতহ ৪৮:২৯</span>
+</section>
+<section style="padding:24px 20px 4px;display:flex;flex-direction:column;gap:10px;">
+<h1 style="margin:0;font:700 26px/1.45 var(--f-ui);color:var(--ink);">নবীজির ﷺ জীবন, ঘটনা ধরে ধরে</h1>
+<p style="margin:0;font:400 17px/1.85 var(--f-read);color:var(--ink-2);text-wrap:pretty;">জন্মের আগের আরব থেকে ইন্তেকাল পর্যন্ত, প্রতিটি ঘটনা মানচিত্র, সূত্র আর শিক্ষাসহ পড়ুন। নিজের বোঝাপড়া লিখে রাখুন, আর যেখানে থেমেছিলেন সেখান থেকেই আবার শুরু করুন।</p>
+</section>
+<section style="padding:18px 16px 0;">
+<div style="background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:14px;">
+<span style="font:600 13px/1.4 var(--f-ui);color:var(--primary-strong);">যেখানে থেমেছিলেন</span>
+<div style="display:flex;flex-direction:column;gap:3px;">
+<span style="font:500 13px/1.5 var(--f-ui);color:var(--ink-2);">পর্ব {{ ev.eraN }} · {{ ev.eraTitle }}</span>
+<h2 style="margin:0;font:700 20px/1.45 var(--f-ui);color:var(--ink);">{{ ev.title }}</h2>
+<span style="font:500 13px/1.6 var(--f-ui);color:var(--ink-2);">{{ ev.hijri }} · {{ ev.greg }} · {{ ev.place }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;">
+<div style="display:flex;justify-content:space-between;gap:12px;font:500 13px/1.4 var(--f-ui);color:var(--ink-2);"><span>{{ readCountLabel }} ঘটনা পড়া হয়েছে</span><span style="font-weight:700;color:var(--ink);">{{ pctLabel }}</span></div>
+<div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden;"><div style="height:100%;width:{{ pctW }};background:var(--gold);border-radius:3px;"></div></div>
+</div>
+<button style="min-height:50px;border:0;border-radius:999px;background:var(--primary);color:var(--on-primary);font:600 16px/1 var(--f-ui);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">পড়া চালিয়ে যান<span aria-hidden="true">›</span></button>
+</div>
+</section>
+<section style="padding:12px 16px 0;">
+<div style="display:flex;align-items:center;gap:12px;min-height:48px;padding-inline:14px;border-radius:16px;background:var(--gold-tint);color:var(--gold-ink);">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8M3 3v5h5M12 8v4l3 2"></path></svg>
+<span style="flex:1;font:500 14.5px/1.5 var(--f-ui);padding-block:10px;">{{ dueText }}</span>
+<span aria-hidden="true">›</span>
+</div>
+</section>
+<section style="padding:28px 16px 28px;display:flex;flex-direction:column;gap:12px;">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-inline:4px;"><h2 style="margin:0;font:700 20px/1.45 var(--f-ui);color:var(--ink);">পাঁচটি পর্ব</h2><span style="font:500 13px/1.5 var(--f-ui);color:var(--ink-2);">মোট {{ totalLabel }}টি ঘটনা</span></div>
+<ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;">
+<sc-for list="{{ eras }}" as="era" hint-placeholder-count="5">
+<li><button style="width:100%;box-sizing:border-box;text-align:start;display:grid;grid-template-columns:40px minmax(0,1fr);gap:14px;align-items:center;padding:14px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;">
+<span style="width:40px;height:40px;box-sizing:border-box;border-radius:50%;border:1px solid var(--primary);background:{{ era.circleBg }};color:{{ era.circleColor }};display:grid;place-items:center;font:600 17px/1 var(--f-ui);">{{ era.n }}</span>
+<span style="display:flex;flex-direction:column;gap:5px;min-width:0;">
+<span style="font:600 16px/1.45 var(--f-ui);">{{ era.title }}</span>
+<span style="font:500 12.5px/1.5 var(--f-ui);color:var(--ink-2);">{{ era.range }} · {{ era.countLabel }}</span>
+<span style="display:flex;align-items:center;gap:10px;"><span style="flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden;"><span style="display:block;height:100%;width:{{ era.pctW }};background:var(--gold);"></span></span><span style="font:600 12px/1 var(--f-ui);color:var(--ink-2);">{{ era.readLabel }}</span></span>
+</span>
+</button></li>
+</sc-for>
+</ol>
+</section>
+</div>
+<dc-import name="TabBar" active="home" due="{{ dueBadge }}" hint-size="100%,74px"></dc-import>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>টাইমলাইন · নোডে ট্যাপ করলে ঘটনা বদলায়</div>
+<div class="dv-card" data-screen-label="02 Timeline" style="width:390px;height:844px;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);border-radius:28px;">
+<header style="position:relative;overflow:hidden;flex:none;padding:18px 20px 16px;border-block-end:1px solid var(--line);display:flex;flex-direction:column;gap:2px;">
+<div aria-hidden="true" style="position:absolute;inset:0;background-image:var(--pattern);background-size:40px 40px;opacity:var(--pattern-op);-webkit-mask-image:linear-gradient(90deg,transparent,#000);mask-image:linear-gradient(90deg,transparent,#000);"></div>
+<h1 style="position:relative;margin:0;font:700 24px/1.45 var(--f-ui);">টাইমলাইন</h1>
+<span style="position:relative;font:500 13px/1.6 var(--f-ui);color:var(--ink-2);">জন্মের আগে থেকে ইন্তেকাল পর্যন্ত · {{ readCountLabel }} পড়া হয়েছে</span>
+</header>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:16px 12px 28px;">
+<dc-import name="TimelineList" eras="{{ eras }}" hint-size="100%,1400px"></dc-import>
+</div>
+<dc-import name="TabBar" active="timeline" due="{{ dueBadge }}" hint-size="100%,74px"></dc-import>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>ঘটনার বিস্তারিত · পূর্ণ দৈর্ঘ্য</div>
+<div class="dv-card" data-screen-label="03 Event detail" style="width:390px;background:var(--bg);color:var(--ink);border-radius:28px;">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding-block:4px;padding-inline:6px 16px;">
+<button style="min-height:44px;display:flex;align-items:center;gap:4px;padding-inline:10px;border:0;background:transparent;color:var(--ink);font:600 15px/1 var(--f-ui);cursor:pointer;"><span aria-hidden="true" style="font-size:22px;line-height:1;">‹</span>টাইমলাইন</button>
+<span style="font:500 13px/1 var(--f-ui);color:var(--ink-2);">{{ ev.idxLabel }}</span>
+</div>
+<dc-import name="EventDetail" ev="{{ ev }}" note="{{ note }}" on-note="{{ onNote }}" is-read="{{ isRead }}" not-read="{{ notRead }}" on-toggle-read="{{ onToggleRead }}" on-prev="{{ onPrev }}" on-next="{{ onNext }}" map-h="{{ 300 }}" motion="{{ motion }}" hint-size="100%,2000px"></dc-import>
+</div>
+</div>
+
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>ঘটনার বিস্তারিত · ডার্ক মোড</div>
+<div class="dv-card" data-theme="dark" data-screen-label="04 Event detail dark" style="width:390px;height:844px;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);border-radius:28px;border-color:#000;">
+<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-block:4px;padding-inline:6px 16px;">
+<button style="min-height:44px;display:flex;align-items:center;gap:4px;padding-inline:10px;border:0;background:transparent;color:var(--ink);font:600 15px/1 var(--f-ui);cursor:pointer;"><span aria-hidden="true" style="font-size:22px;line-height:1;">‹</span>টাইমলাইন</button>
+<span style="font:500 13px/1 var(--f-ui);color:var(--ink-2);">{{ ev.idxLabel }}</span>
+</div>
+<div style="flex:1;min-height:0;overflow-y:auto;">
+<dc-import name="EventDetail" ev="{{ ev }}" note="{{ note }}" on-note="{{ onNote }}" is-read="{{ isRead }}" not-read="{{ notRead }}" on-toggle-read="{{ onToggleRead }}" on-prev="{{ onPrev }}" on-next="{{ onNext }}" map-h="{{ 300 }}" motion="{{ motion }}" hint-size="100%,2000px"></dc-import>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1e">
+<div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>পুনরালোচনা · উত্তর দিয়ে দেখুন</div>
+<div class="dv-card" data-screen-label="05 Recall review" style="width:390px;height:844px;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);border-radius:28px;">
+<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">
+<header style="padding:18px 20px 8px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+<div style="display:flex;flex-direction:column;gap:2px;"><h1 style="margin:0;font:700 24px/1.45 var(--f-ui);">পুনরালোচনা</h1><span style="font:500 13px/1.6 var(--f-ui);color:var(--ink-2);">পড়া ঘটনাগুলো মনে আছে কি না, একটু দেখে নিই</span></div>
+<span style="margin-block-start:4px;padding:4px 12px;border-radius:999px;background:var(--gold-tint);color:var(--gold-ink);font:600 13px/1.6 var(--f-ui);">আজ বাকি {{ dueLabel }}টি</span>
+</header>
+<sc-if value="{{ notDone }}" hint-placeholder-val="{{ true }}">
+<div style="padding:12px 16px 20px;display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-inline:4px;">
+<div style="display:flex;gap:6px;align-items:center;"><sc-for list="{{ dots }}" as="d" hint-placeholder-count="4"><span style="height:8px;width:{{ d.w }};border-radius:4px;background:{{ d.bg }};transition:width .6s ease;"></span></sc-for></div>
+<span style="font:500 13px/1 var(--f-ui);color:var(--ink-2);">{{ q.posLabel }}</span>
+</div>
+<div style="background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px 18px;display:flex;flex-direction:column;gap:16px;">
+<div style="display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;">
+<span style="padding:2px 10px;border-radius:999px;background:var(--primary-tint);color:var(--primary-strong);font:600 12.5px/1.7 var(--f-ui);">{{ q.type }}</span>
+<span style="font:500 13px/1.6 var(--f-ui);color:var(--ink-2);">{{ q.eventTitle }}</span>
+</div>
+<h2 style="margin:0;font:600 21px/1.55 var(--f-ui);color:var(--ink);text-wrap:pretty;">{{ q.text }}</h2>
+<div style="display:flex;flex-direction:column;gap:8px;">
+<sc-for list="{{ q.options }}" as="o" hint-placeholder-count="4">
+<button onClick="{{ o.pick }}" disabled="{{ o.disabled }}" style="min-height:56px;width:100%;box-sizing:border-box;display:grid;grid-template-columns:32px minmax(0,1fr) 20px;gap:12px;align-items:center;padding:10px 14px;border-radius:14px;border:1.5px solid {{ o.border }};background:{{ o.bg }};color:var(--ink);opacity:{{ o.op }};text-align:start;font:500 16px/1.5 var(--f-ui);cursor:pointer;transition:background .4s ease,border-color .4s ease,opacity .4s ease;">
+<span style="width:32px;height:32px;box-sizing:border-box;border-radius:50%;background:var(--bg);border:1px solid var(--line);display:grid;place-items:center;font:600 14px/1 var(--f-ui);color:var(--ink-2);">{{ o.letter }}</span>
+<span>{{ o.text }}</span>
+<span style="font:700 16px/1 var(--f-ui);color:{{ o.markColor }};">{{ o.mark }}</span>
+</button>
+</sc-for>
+</div>
+<sc-if value="{{ q.picked }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px;padding-block-start:14px;border-block-start:1px solid var(--line);">
+<p style="margin:0;font:600 16px/1.6 var(--f-ui);color:{{ q.fbColor }};">{{ q.fbTitle }}</p>
+<p style="margin:0;font:400 16px/1.8 var(--f-read);color:var(--ink-2);">{{ q.why }}</p>
+<span style="font:600 13px/1.5 var(--f-ui);color:var(--ink-2);padding-block-start:4px;">{{ q.rateHint }}</span>
+<div style="display:flex;gap:8px;">
+<sc-for list="{{ q.rates }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.go }}" style="flex:1 1 0;min-width:0;min-height:56px;padding:6px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;"><span style="font:600 14px/1.35 var(--f-ui);">{{ r.label }}</span><span style="font:500 12px/1.35 var(--f-ui);color:var(--ink-2);">{{ r.when }}</span></button></sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+<p style="margin:0;padding-inline:4px;font:400 13px/1.7 var(--f-ui);color:var(--ink-2);">ভুল হলে প্রশ্নটি আগামীকাল আবার আসবে। মনে থাকলে বিরতি ধীরে ধীরে বাড়বে।</p>
+</div>
+</sc-if>
+<sc-if value="{{ reviewDone }}" hint-placeholder-val="{{ false }}">
+<div style="padding:24px 16px;display:flex;flex-direction:column;gap:14px;">
+<div style="position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;">
+<div aria-hidden="true" style="position:absolute;inset-inline:0;inset-block-start:0;height:56px;background-image:var(--pattern);background-size:28px 28px;opacity:var(--pattern-op);-webkit-mask-image:linear-gradient(transparent,#000 0,transparent);mask-image:linear-gradient(#000,transparent);"></div>
+<span style="position:relative;width:56px;height:56px;border-radius:50%;background:var(--primary-tint);color:var(--primary-strong);display:grid;place-items:center;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>
+<h2 style="position:relative;margin:0;font:700 21px/1.5 var(--f-ui);">আজকের পুনরালোচনা শেষ</h2>
+<p style="position:relative;margin:0;font:400 16px/1.8 var(--f-read);color:var(--ink-2);">{{ resultText }}</p>
+<span style="position:relative;font:600 13.5px/1.6 var(--f-ui);color:var(--gold-ink);">ধারাবাহিকতা: {{ streakLabel }} দিন</span>
+</div>
+<button onClick="{{ restartReview }}" style="min-height:48px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 15px/1 var(--f-ui);cursor:pointer;">আবার চালান (ডেমো)</button>
+</div>
+</sc-if>
+</div>
+<dc-import name="TabBar" active="review" due="{{ dueBadge }}" hint-size="100%,74px"></dc-import>
+</div>
+</div>
+
+<div class="dv-opt" id="1f">
+<div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>আমার অগ্রগতি</div>
+<div class="dv-card" data-screen-label="06 My progress" style="width:390px;height:844px;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);border-radius:28px;">
+<div style="flex:1;min-height:0;overflow-y:auto;">
+<header style="padding:18px 20px 8px;"><h1 style="margin:0;font:700 24px/1.45 var(--f-ui);">আমার অগ্রগতি</h1></header>
+<section style="padding:8px 16px 0;">
+<div style="display:flex;align-items:center;gap:18px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;">
+<div style="flex:none;width:112px;height:112px;border-radius:50%;background:conic-gradient(var(--gold) {{ ringDeg }},var(--line) 0);display:grid;place-items:center;">
+<div style="width:96px;height:96px;border-radius:50%;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;"><span style="font:700 26px/1.2 var(--f-ui);color:var(--ink);">{{ pctLabel }}</span><span style="font:500 11.5px/1.4 var(--f-ui);color:var(--ink-2);">সম্পূর্ণ</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px;min-width:0;">
+<span style="font:700 18px/1.45 var(--f-ui);">{{ readCountLabel }} ঘটনা পড়া হয়েছে</span>
+<span style="font:500 13.5px/1.6 var(--f-ui);color:var(--ink-2);">{{ erasDoneLabel }}</span>
+<span style="font:500 13.5px/1.6 var(--f-ui);color:var(--ink-2);">{{ notesCountLabel }}</span>
+</div>
+</div>
+</section>
+<section style="padding:12px 16px 0;">
+<div style="background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:14px;">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;"><span style="font:600 16px/1.5 var(--f-ui);">পুনরালোচনার ধারাবাহিকতা</span><span style="font:700 18px/1.4 var(--f-ui);color:var(--gold-ink);">{{ streakLabel }} দিন</span></div>
+<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;">
+<sc-for list="{{ week }}" as="d" hint-placeholder-count="7"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="width:30px;height:30px;box-sizing:border-box;border-radius:50%;background:{{ d.bg }};border:1.5px {{ d.borderStyle }} {{ d.border }};color:#1E1A16;display:grid;place-items:center;font:700 12px/1 var(--f-ui);">{{ d.mark }}</span><span style="font:500 12px/1 var(--f-ui);color:{{ d.labelColor }};">{{ d.label }}</span></div></sc-for>
+</div>
+</div>
+</section>
+<section style="padding:24px 16px 0;display:flex;flex-direction:column;gap:12px;">
+<h2 style="margin:0;padding-inline:4px;font:700 18px/1.45 var(--f-ui);">পর্ব অনুযায়ী</h2>
+<div style="background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:6px 18px;display:flex;flex-direction:column;">
+<sc-for list="{{ eras }}" as="era" hint-placeholder-count="5"><div style="display:flex;flex-direction:column;gap:7px;padding-block:12px;border-block-end:1px solid var(--line);">
+<div style="display:flex;justify-content:space-between;gap:12px;"><span style="font:600 15px/1.5 var(--f-ui);">{{ era.n }}. {{ era.title }}</span><span style="flex:none;font:600 13px/1.5 var(--f-ui);color:var(--ink-2);">{{ era.readLabel }}</span></div>
+<div style="height:5px;border-radius:3px;background:var(--line);overflow:hidden;"><div style="height:100%;width:{{ era.pctW }};background:var(--gold);"></div></div>
+</div></sc-for>
+</div>
+</section>
+<section style="padding:24px 16px 28px;display:flex;flex-direction:column;gap:10px;">
+<h2 style="margin:0;padding-inline:4px;font:700 18px/1.45 var(--f-ui);">আমার নোট</h2>
+<sc-for list="{{ notesList }}" as="nt" hint-placeholder-count="3">
+<button onClick="{{ nt.open }}" style="width:100%;box-sizing:border-box;text-align:start;display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;">
+<span style="display:flex;justify-content:space-between;gap:12px;width:100%;"><span style="font:600 15px/1.5 var(--f-ui);">{{ nt.title }}</span><span style="flex:none;font:500 12px/1.6 var(--f-ui);color:var(--ink-2);">{{ nt.date }}</span></span>
+<span style="font:400 15.5px/1.8 var(--f-read);color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">{{ nt.text }}</span>
+</button>
+</sc-for>
+</section>
+</div>
+<dc-import name="TabBar" active="progress" due="{{ dueBadge }}" hint-size="100%,74px"></dc-import>
+</div>
+</div>
+</div>
+
+<div class="dv-opts" style="margin-top:56px;">
+<div class="dv-opt" id="1g">
+<div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>ডেস্কটপ · বামে টাইমলাইন, ডানে ঘটনা</div>
+<div class="dv-card" data-screen-label="07 Desktop" style="width:1280px;height:860px;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);border-radius:12px;">
+<header style="position:relative;overflow:hidden;flex:none;display:flex;align-items:center;gap:28px;padding-inline:28px 20px;min-height:68px;border-block-end:1px solid var(--line);background:var(--surface);">
+<div aria-hidden="true" style="position:absolute;inset:0;background-image:var(--pattern);background-size:40px 40px;opacity:var(--pattern-op);-webkit-mask-image:linear-gradient(90deg,transparent 20%,#000 60%,transparent);mask-image:linear-gradient(90deg,transparent 20%,#000 60%,transparent);"></div>
+<div style="position:relative;display:flex;align-items:baseline;gap:10px;"><span style="font:700 20px/1.3 var(--f-ui);">সীরাতের পথে</span><span lang="ar" dir="rtl" style="font:400 14px/1.6 var(--f-ar);color:var(--ink-2);">السيرة النبوية</span></div>
+<nav style="position:relative;display:flex;gap:4px;flex:1;">
+<a href="#1a" style="min-height:44px;display:flex;align-items:center;padding-inline:14px;border-radius:999px;color:var(--ink-2);font:500 15px/1 var(--f-ui);text-decoration:none;">হোম</a>
+<a href="#1b" aria-current="page" style="min-height:44px;display:flex;align-items:center;padding-inline:14px;border-radius:999px;background:var(--primary-tint);color:var(--primary-strong);font:700 15px/1 var(--f-ui);text-decoration:none;">টাইমলাইন</a>
+<a href="#1e" style="min-height:44px;display:flex;align-items:center;gap:8px;padding-inline:14px;border-radius:999px;color:var(--ink-2);font:500 15px/1 var(--f-ui);text-decoration:none;">পুনরালোচনা<sc-if value="{{ hasDue }}" hint-placeholder-val="{{ true }}"><span style="min-width:20px;height:20px;padding-inline:6px;box-sizing:border-box;border-radius:10px;background:var(--gold);color:#1E1A16;font:700 12px/20px var(--f-ui);text-align:center;">{{ dueBadge }}</span></sc-if></a>
+<a href="#1f" style="min-height:44px;display:flex;align-items:center;padding-inline:14px;border-radius:999px;color:var(--ink-2);font:500 15px/1 var(--f-ui);text-decoration:none;">অগ্রগতি</a>
+</nav>
+<div style="position:relative;display:flex;align-items:center;gap:4px;">
+<button aria-label="ভাষা নির্বাচন" style="min-height:44px;display:flex;align-items:center;gap:6px;padding-inline:12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 14px/1 var(--f-ui);cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>বাংলা<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></button>
+<button onClick="{{ toggleTheme }}" aria-label="থিম পরিবর্তন" style="width:44px;height:44px;border-radius:50%;border:0;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer;">
+<sc-if value="{{ isLight }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13.5A8.5 8.5 0 1 1 10.5 3.5a6.5 6.5 0 0 0 10 10z"></path></svg></sc-if>
+<sc-if value="{{ isDark }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg></sc-if>
+</button>
+</div>
+</header>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:400px minmax(0,1fr);">
+<aside style="min-height:0;overflow-y:auto;border-inline-end:1px solid var(--line);padding:24px 18px 32px;display:flex;flex-direction:column;gap:18px;">
+<div style="display:flex;flex-direction:column;gap:8px;padding-inline:4px;">
+<h2 style="margin:0;font:700 22px/1.4 var(--f-ui);">টাইমলাইন</h2>
+<div style="display:flex;align-items:center;gap:10px;"><div style="flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden;"><div style="height:100%;width:{{ pctW }};background:var(--gold);"></div></div><span style="font:600 13px/1 var(--f-ui);color:var(--ink-2);">{{ pctLabel }}</span></div>
+<span style="font:500 13px/1.5 var(--f-ui);color:var(--ink-2);">{{ readCountLabel }} ঘটনা পড়া হয়েছে</span>
+</div>
+<dc-import name="TimelineList" eras="{{ eras }}" hint-size="100%,1400px"></dc-import>
+</aside>
+<main style="min-height:0;overflow-y:auto;">
+<dc-import name="EventDetail" ev="{{ ev }}" note="{{ note }}" on-note="{{ onNote }}" is-read="{{ isRead }}" not-read="{{ notRead }}" on-toggle-read="{{ onToggleRead }}" on-prev="{{ onPrev }}" on-next="{{ onNext }}" map-h="{{ 380 }}" motion="{{ motion }}" hint-size="100%,2000px"></dc-import>
+</main>
+</div>
+</div>
+</div>
+</div>
+
+<p class="dv-next">Try next: "tablet layout at 768px" · "a more manuscript-like event page with marginal notes on desktop" · "show the Arabic RTL mirror of 1c"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;motion&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;full&quot;,&quot;reduced&quot;],&quot;default&quot;:&quot;full&quot;,&quot;tsType&quot;:&quot;'full'|'reduced'&quot;}}">
+const BN = '০১২৩৪৫৬৭৮৯';
+const bn = n => String(n).replace(/\d/g, d => BN[+d]);
+const isNum = a => /[০-৯]/.test(a);
+const ERAS = [
+  { title: 'ইসলামপূর্ব আরব ও জন্মের আগে', range: 'আনু. ৫৭০ খ্রি. পর্যন্ত' },
+  { title: 'শৈশব ও যৌবন', range: '৫৭০–৬১০ খ্রি. · বয়স ০–৪০' },
+  { title: 'মক্কায় নবুয়ত', range: '৬১০–৬২২ খ্রি. · বয়স ৪০–৫৩' },
+  { title: 'হিজরত', range: '৬২২ খ্রি. · ১ হিজরি' },
+  { title: 'মদিনার জীবন', range: '৬২২–৬৩২ খ্রি. · ১–১১ হিজরি' }
+];
+const SRC_HISHAM = 'ইবনে হিশাম, আস-সীরাতুন নাবাবিয়্যাহ';
+const SRC_RAHIQ = 'সফিউর রহমান মুবারকপুরী, আর-রাহীকুল মাখতূম';
+const EV = [
+  { id: 'e1', era: 0, title: 'হস্তীবাহিনীর বছর', hijri: '৫৩ হি.পূ.', greg: 'আনু. ৫৭০ খ্রি.', age: 'জন্মের আগে', place: 'মক্কা', view: 'south', route: 'elephant', places: 'sanaa,taif,makkah', hl: 'makkah', status: 'agreed',
+    summary: 'ইয়েমেনের শাসক আবরাহা কাবা ধ্বংস করার উদ্দেশ্যে হাতিসহ বিশাল এক বাহিনী নিয়ে মক্কার দিকে অগ্রসর হয়। মক্কার উপকণ্ঠে পৌঁছালে আল্লাহ ঝাঁকে ঝাঁকে পাখি পাঠান; তারা পোড়ামাটির কঙ্কর নিক্ষেপ করে এবং বাহিনীটি ধ্বংস হয়ে যায়। আরবরা এই বছরকে "আমুল ফীল" নামে স্মরণ করত, আর এ বছরেই নবীজি ﷺ জন্মগ্রহণ করেন।',
+    key: ['আবরাহা সানআয় একটি বিশাল গির্জা নির্মাণ করে আরবদের হজ সেদিকে ফিরিয়ে নিতে চেয়েছিল।', 'মক্কার নেতা আবদুল মুত্তালিব আবরাহার কাছে শুধু নিজের উট ফেরত চান এবং বলেন, এই ঘরের একজন রব আছেন, তিনিই একে রক্ষা করবেন।', 'মক্কাবাসী আশপাশের পাহাড়ে আশ্রয় নেয়; কাবা রক্ষা পায় আল্লাহর সরাসরি হস্তক্ষেপে।'],
+    lessons: ['আল্লাহর ঘরের হেফাজতকারী আল্লাহ নিজেই।', 'শক্তি ও সংখ্যার অহংকার আল্লাহর ইচ্ছার সামনে টেকে না।', 'নবুয়তের আগেই আল্লাহ মক্কার মর্যাদা স্পষ্ট করে দেন।'],
+    sources: ['সূরা আল-ফীল (১০৫)', SRC_HISHAM, SRC_RAHIQ],
+    ar: 'أَلَمْ تَرَ كَيْفَ فَعَلَ رَبُّكَ بِأَصْحَابِ الْفِيلِ', arTr: 'তুমি কি দেখোনি, তোমার রব হস্তীবাহিনীর সাথে কী করেছিলেন?', arRef: 'সূরা আল-ফীল ১০৫:১' },
+  { id: 'e2', era: 0, title: 'পিতা আবদুল্লাহর ইন্তেকাল', hijri: '৫৩ হি.পূ.', greg: 'আনু. ৫৭০ খ্রি.', age: 'জন্মের আগে', place: 'ইয়াসরিব (মদিনা)', view: 'hijaz', places: 'makkah,madinah', hl: 'madinah', status: 'disputed',
+    dispute: 'অধিকাংশ বর্ণনা অনুযায়ী তিনি নবীজির ﷺ জন্মের আগেই ইন্তেকাল করেন; কিছু বর্ণনায় জন্মের কয়েক মাস পরের কথা এসেছে।',
+    summary: 'বাণিজ্য সফর থেকে ফেরার পথে নবীজির ﷺ পিতা আবদুল্লাহ ইয়াসরিবে অসুস্থ হয়ে পড়েন এবং সেখানেই ইন্তেকাল করেন। নবীজি ﷺ তাই পিতাকে না দেখেই পৃথিবীতে আসেন।' },
+  { id: 'e3', era: 1, title: 'নবীজির ﷺ জন্ম', hijri: '৫৩ হি.পূ.', greg: 'আনু. ৫৭০–৫৭১ খ্রি.', age: 'জন্ম', place: 'মক্কা', view: 'makkah', places: 'makkah', hl: 'makkah', status: 'disputed',
+    dispute: 'রবিউল আউয়াল মাসের এক সোমবার জন্ম, এ বিষয়ে সবাই একমত। তারিখ নিয়ে মতভেদ আছে: প্রসিদ্ধ মত ১২ রবিউল আউয়াল, আর আর-রাহীকুল মাখতূমে ৯ রবিউল আউয়াল উল্লেখ করা হয়েছে।',
+    summary: 'হস্তীবাহিনীর বছরে, রবিউল আউয়াল মাসের এক সোমবার মক্কায় বনু হাশিম গোত্রে নবীজি ﷺ জন্মগ্রহণ করেন। তাঁর মা আমিনা, আর দাদা আবদুল মুত্তালিব তাঁর নাম রাখেন মুহাম্মাদ।',
+    key: ['পিতা আবদুল্লাহ তাঁর জন্মের আগেই ইন্তেকাল করেন; দাদা আবদুল মুত্তালিব তাঁর অভিভাবক হন।', 'সোমবারে রোজা রাখা প্রসঙ্গে নবীজি ﷺ বলেছেন, এ দিনেই তাঁর জন্ম হয়েছে (সহীহ মুসলিম)।', 'আরব রীতি অনুযায়ী শিগগিরই তাঁকে দুধমায়ের কাছে মরুভূমিতে পাঠানোর প্রস্তুতি নেওয়া হয়।'],
+    lessons: ['আল্লাহ তাঁর রাসূলকে ﷺ ইয়াতীম অবস্থায় বড় করেছেন; তিনিই ছিলেন তাঁর প্রকৃত অভিভাবক।', 'বংশমর্যাদা ও পরিবেশ, দুটোই নবুয়তের দায়িত্বের জন্য প্রস্তুত ছিল।'],
+    sources: ['সহীহ মুসলিম, কিতাবুস সিয়াম', SRC_HISHAM, SRC_RAHIQ] },
+  { id: 'e4', era: 1, title: 'হালিমা সাদিয়ার কাছে শৈশব', hijri: '৫৩–৪৯ হি.পূ.', greg: 'আনু. ৫৭১–৫৭৫ খ্রি.', age: '০–৪', place: "বনু সা'দের মরু অঞ্চল", view: 'makkahwide', route: 'halima', places: 'makkah,banusad', hl: 'banusad', status: 'agreed',
+    summary: "মক্কার অভিজাত পরিবারগুলোর রীতি ছিল শিশুদের মরুভূমির বেদুইন পরিবারে পাঠানো, যেন তারা বিশুদ্ধ আরবি ভাষা ও সুস্থ পরিবেশে বড় হয়। বনু সা'দ গোত্রের হালিমা সাদিয়া শিশু মুহাম্মাদকে ﷺ গ্রহণ করেন, আর তাঁর ঘরে বরকত নেমে আসে।",
+    key: ['হালিমা নিজে বর্ণনা করেছেন, তাঁর দুর্বল উটনী ও শুকনো চারণভূমি এই শিশুর আগমনের পর প্রাচুর্যে ভরে ওঠে।', 'এ সময়েই বক্ষ বিদারণের (শাক্কুস সদর) ঘটনা ঘটে, যা সহীহ মুসলিমে বর্ণিত।', 'প্রায় চার বা পাঁচ বছর বয়সে তাঁকে মা আমিনার কাছে ফিরিয়ে দেওয়া হয়।'],
+    lessons: ['শিশুর ভাষা ও চরিত্র গঠনে পরিবেশের প্রভাব গভীর।', 'যার কাছে আল্লাহর রহমত থাকে, তার সান্নিধ্যে অন্যরাও বরকত পায়।'],
+    sources: [SRC_HISHAM, 'সহীহ মুসলিম, কিতাবুল ঈমান', SRC_RAHIQ] },
+  { id: 'e5', era: 1, title: 'মা আমিনার ইন্তেকাল', hijri: '৪৭ হি.পূ.', greg: 'আনু. ৫৭৬ খ্রি.', age: '৬', place: 'আবওয়া', view: 'hijaz', route: 'abwa', places: 'madinah,abwa,makkah', hl: 'abwa', status: 'agreed',
+    summary: 'ইয়াসরিবে আত্মীয়দের সাথে দেখা করে ফেরার পথে মক্কা ও মদিনার মাঝামাঝি আবওয়া নামক স্থানে মা আমিনা ইন্তেকাল করেন। এরপর দাদা আবদুল মুত্তালিব, এবং তাঁর মৃত্যুর পর চাচা আবু তালিব তাঁর দায়িত্ব নেন।' },
+  { id: 'e6', era: 1, title: 'খাদিজা (রা.)-এর সাথে বিবাহ', hijri: '২৮ হি.পূ.', greg: 'আনু. ৫৯৫ খ্রি.', age: '২৫', place: 'মক্কা', view: 'makkah', places: 'makkah', hl: 'makkah', status: 'agreed',
+    summary: 'খাদিজা (রা.)-এর বাণিজ্য কাফেলা নিয়ে সিরিয়া সফরে নবীজির ﷺ সততা ও বিশ্বস্ততা দেখে তিনি বিবাহের প্রস্তাব পাঠান। এই দাম্পত্য ছিল পারস্পরিক শ্রদ্ধা ও সহযোগিতায় ভরা।' },
+  { id: 'e7', era: 1, title: 'হাজরে আসওয়াদ স্থাপন', hijri: '১৮ হি.পূ.', greg: 'আনু. ৬০৫ খ্রি.', age: '৩৫', place: 'কাবা, মক্কা', view: 'makkah', places: 'makkah', hl: 'makkah', status: 'agreed',
+    summary: 'কাবা পুনর্নির্মাণের সময় হাজরে আসওয়াদ কে স্থাপন করবে, তা নিয়ে কুরাইশ গোত্রগুলোর মধ্যে বিরোধ চরমে ওঠে। নবীজি ﷺ একটি চাদরে পাথরটি রেখে প্রত্যেক গোত্রের প্রতিনিধিকে চাদরের প্রান্ত ধরতে বলেন, তারপর নিজে পাথরটি যথাস্থানে বসিয়ে দেন।' },
+  { id: 'e8', era: 2, title: 'হেরা গুহায় প্রথম ওহী', hijri: '১৩ হি.পূ.', greg: 'আনু. ৬১০ খ্রি.', age: '৪০', place: 'জাবালে নূর, মক্কা', view: 'makkah', places: 'makkah,hira', hl: 'hira', status: 'agreed',
+    summary: 'নবুয়তের আগের বছরগুলোতে নবীজি ﷺ মক্কার কাছে জাবালে নূরের হেরা গুহায় নির্জনে ইবাদতে সময় কাটাতেন। চল্লিশ বছর বয়সে রমজান মাসে সেখানেই প্রথম ওহী নাযিল হয়: সূরা আল-আলাকের প্রথম পাঁচটি আয়াত। এর মধ্য দিয়েই নবুয়তের সূচনা হয়।',
+    key: ['জিবরাঈল (আ.) এসে বলেন "পড়ুন"; নবীজি ﷺ উত্তর দেন, "আমি পড়তে জানি না।"', 'ঘরে ফিরে তিনি খাদিজা (রা.)-কে বলেন, "আমাকে চাদর দিয়ে ঢেকে দাও।" খাদিজা (রা.) তাঁকে সান্ত্বনা দেন এবং তাঁর উত্তম চরিত্রের কথা স্মরণ করিয়ে দেন।', 'খাদিজা (রা.) তাঁকে নিয়ে যান চাচাতো ভাই ওয়ারাকা ইবনে নাওফালের কাছে, যিনি একে নবুয়তের সূচনা বলে চিনতে পারেন।'],
+    lessons: ['ইসলামের প্রথম আদেশটিই ছিল পড়া ও জ্ঞান অর্জনের।', 'কঠিন মুহূর্তে জীবনসঙ্গীর আস্থা ও সান্ত্বনা অমূল্য।', 'নির্জনে চিন্তা ও ইবাদত বড় দায়িত্বের জন্য হৃদয়কে প্রস্তুত করে।'],
+    sources: ['সহীহ বুখারী, বাদউল ওহী', 'সূরা আল-আলাক ৯৬:১–৫', SRC_RAHIQ],
+    ar: 'اقْرَأْ بِاسْمِ رَبِّكَ الَّذِي خَلَقَ', arTr: 'পাঠ করুন আপনার রবের নামে, যিনি সৃষ্টি করেছেন।', arRef: 'সূরা আল-আলাক ৯৬:১' },
+  { id: 'e10', era: 2, title: 'আবিসিনিয়ায় হিজরত', hijri: '৮ হি.পূ.', greg: 'আনু. ৬১৫ খ্রি.', age: '৪৫', place: 'হাবশা', view: 'horn', route: 'habasha', places: 'makkah,habasha', hl: 'habasha', status: 'agreed',
+    summary: 'মক্কায় নির্যাতন তীব্র হলে নবীজির ﷺ অনুমতিতে একদল মুসলিম লোহিত সাগর পাড়ি দিয়ে ন্যায়পরায়ণ বাদশাহ নাজাশীর দেশ হাবশায় আশ্রয় নেন। এটি ছিল ইসলামের ইতিহাসে প্রথম হিজরত।' },
+  { id: 'e11', era: 2, title: 'ইসরা ও মিরাজ', hijri: '১ হি.পূ. (আনু.)', greg: 'আনু. ৬২১ খ্রি.', age: 'আনু. ৫২', place: 'মক্কা → বায়তুল মাকদিস', view: 'north', route: 'isra', places: 'makkah,quds', hl: 'quds', status: 'disputed',
+    dispute: 'ঘটনাটি সর্বসম্মত, তবে এর সাল ও মাস নিয়ে আলেমদের মধ্যে একাধিক মত রয়েছে।',
+    summary: 'এক রাতে আল্লাহ নবীজিকে ﷺ মসজিদুল হারাম থেকে মসজিদুল আকসায় নিয়ে যান, এরপর ঊর্ধ্বাকাশে। এই সফরেই পাঁচ ওয়াক্ত নামাজ ফরজ হয়।' },
+  { id: 'e12', era: 3, title: 'হিজরত, মক্কা থেকে মদিনা', hijri: '১ হি.', greg: '৬২২ খ্রি.', age: '৫৩', place: 'মক্কা → মদিনা', view: 'hijaz', route: 'hijrah', places: 'makkah,thawr,madinah', hl: 'madinah', status: 'agreed',
+    summary: 'কুরাইশরা নবীজিকে ﷺ হত্যার ষড়যন্ত্র করলে আল্লাহর নির্দেশে তিনি আবু বকর (রা.)-কে সঙ্গে নিয়ে রাতের অন্ধকারে মক্কা ত্যাগ করেন। তাঁরা তিন রাত সাওর গুহায় আত্মগোপন করেন, তারপর প্রচলিত পথ এড়িয়ে উপকূলের দিক দিয়ে মদিনার পথে যাত্রা করেন। কুবায় কয়েক দিন অবস্থানের পর তিনি মদিনায় প্রবেশ করেন; পরে এই ঘটনা থেকেই হিজরি সনের গণনা শুরু হয়।',
+    key: ['যে রাতে ঘাতকেরা ঘর ঘিরে রেখেছিল, আলী (রা.) নবীজির ﷺ বিছানায় শুয়ে থাকেন এবং পরে মানুষের গচ্ছিত আমানত ফেরত দেন।', 'সাওর গুহায় তিন রাত: আবদুল্লাহ ইবনে আবু বকর মক্কার খবর আনতেন, আর আসমা বিনতে আবু বকর (রা.) খাবার পৌঁছে দিতেন।', 'পথপ্রদর্শক আবদুল্লাহ ইবনে উরাইকিত তাঁদের অপ্রচলিত উপকূলীয় পথে নিয়ে যান।', 'কুবায় পৌঁছে নবীজি ﷺ মসজিদে কুবার ভিত্তি স্থাপন করেন, যা ইসলামের প্রথম মসজিদ।'],
+    lessons: ['আল্লাহর ওপর ভরসা আর সতর্ক পরিকল্পনা একসাথে চলে।', 'শত্রুর গচ্ছিত আমানতও ফেরত দেওয়া ঈমানের দাবি।', 'দ্বীনের জন্য পুরো পরিবার যার যার সামর্থ্যে অংশ নিয়েছিল।'],
+    sources: ['সহীহ বুখারী, কিতাবু মানাকিবিল আনসার', SRC_HISHAM, SRC_RAHIQ],
+    ar: 'لَا تَحْزَنْ إِنَّ اللَّهَ مَعَنَا', arTr: 'চিন্তা কোরো না, নিশ্চয়ই আল্লাহ আমাদের সাথে আছেন।', arRef: 'সূরা আত-তাওবা ৯:৪০' },
+  { id: 'e13', era: 3, title: 'কুবা মসজিদ নির্মাণ', hijri: '১ হি.', greg: '৬২২ খ্রি.', age: '৫৩', place: 'কুবা, মদিনা', view: 'madinah', places: 'quba,madinah', hl: 'quba', status: 'agreed',
+    summary: 'মদিনায় প্রবেশের আগে নবীজি ﷺ কুবায় কয়েক দিন অবস্থান করেন এবং সেখানে মসজিদে কুবা নির্মাণ করেন। নির্মাণকাজে তিনি নিজেও অংশ নেন।' },
+  { id: 'e14', era: 4, title: 'বদরের যুদ্ধ', hijri: '২ হি.', greg: '৬২৪ খ্রি.', age: '৫৫', place: 'বদর', view: 'hijaz', places: 'madinah,badr,makkah', hl: 'badr', status: 'agreed',
+    summary: 'রমজান মাসে বদর প্রান্তরে প্রায় ৩১৩ জন মুসলিম তিন গুণের বেশি সংখ্যক কুরাইশ বাহিনীর মুখোমুখি হন। আল্লাহর সাহায্যে মুসলিমরা বিজয়ী হন; কুরআনে এই দিনকে "ইয়াওমুল ফুরকান" বলা হয়েছে।' },
+  { id: 'e16', era: 4, title: 'মক্কা বিজয়', hijri: '৮ হি.', greg: '৬৩০ খ্রি.', age: '৬১', place: 'মক্কা', view: 'hijaz', route: 'fath', places: 'madinah,makkah', hl: 'makkah', status: 'agreed',
+    summary: 'কুরাইশরা হুদাইবিয়ার সন্ধি ভঙ্গ করলে নবীজি ﷺ দশ হাজার সাহাবি নিয়ে মক্কার দিকে যাত্রা করেন। প্রায় রক্তপাতহীনভাবে মক্কা বিজিত হয়, এবং তিনি পুরোনো শত্রুদের জন্য সাধারণ ক্ষমা ঘোষণা করেন।' },
+  { id: 'e17', era: 4, title: 'বিদায় হজ', hijri: '১০ হি.', greg: '৬৩২ খ্রি.', age: '৬৩', place: 'আরাফাহ, মক্কা', view: 'makkah', places: 'makkah,arafat', hl: 'arafat', status: 'agreed',
+    summary: 'জীবনের একমাত্র হজে নবীজি ﷺ আরাফাহর ময়দানে বিদায়ী ভাষণ দেন। তিনি মানুষের জীবন, সম্পদ ও সম্মানের পবিত্রতা এবং সব মানুষের সমতার কথা ঘোষণা করেন।' },
+  { id: 'e18', era: 4, title: 'নবীজির ﷺ ইন্তেকাল', hijri: '১১ হি.', greg: '৬৩২ খ্রি.', age: '৬৩', place: 'মদিনা', view: 'madinah', places: 'madinah', hl: 'madinah', status: 'agreed',
+    summary: 'বিদায় হজের কয়েক মাস পর রবিউল আউয়াল মাসে নবীজি ﷺ মদিনায় আয়েশা (রা.)-এর ঘরে ইন্তেকাল করেন। তাঁকে সেখানেই দাফন করা হয়, যা আজ মসজিদে নববীর অংশ।' }
+];
+const ROUTE_LABEL = { hijrah: 'হিজরতের আনুমানিক পথ', elephant: 'আবরাহার বাহিনীর আনুমানিক পথ', halima: "বনু সা'দের দিকে", abwa: 'ইয়াসরিব থেকে ফেরার পথ', habasha: 'হাবশার পথে, সমুদ্রপথসহ', isra: 'রাত্রিকালীন সফর', fath: 'মদিনা থেকে মক্কার পথে' };
+const QS = [
+  { ev: 'e8', type: 'স্থান', q: 'প্রথম ওহী কোথায় নাযিল হয়?', opts: ['সাওর গুহায়', 'হেরা গুহায়', 'মসজিদে কুবায়', 'সাফা পাহাড়ে'], a: 1, why: 'মক্কার কাছে জাবালে নূরের হেরা গুহায়, রমজান মাসে।' },
+  { ev: 'e8', type: 'বয়স', q: 'প্রথম ওহীর সময় নবীজির ﷺ বয়স কত ছিল?', opts: ['২৫ বছর', '৩৫ বছর', '৪০ বছর', '৫৩ বছর'], a: 2, why: 'চল্লিশ বছর বয়সে, আনুমানিক ৬১০ খ্রিস্টাব্দে।' },
+  { ev: 'e1', type: 'পরিণতি', q: 'হস্তীবাহিনীর শেষ পরিণতি কী হয়েছিল?', opts: ['কাবা ক্ষতিগ্রস্ত করে ফিরে যায়', 'মক্কাবাসীর সাথে সন্ধি করে', 'পাখির নিক্ষিপ্ত কঙ্করে ধ্বংস হয়', 'নিরাপদে ইয়েমেনে ফিরে যায়'], a: 2, why: 'সূরা আল-ফীলে এই ঘটনার বর্ণনা আছে।' },
+  { ev: 'e4', type: 'গোত্র', q: 'শৈশবে নবীজি ﷺ কোন গোত্রের দুধমায়ের কাছে বড় হন?', opts: ["বনু সা'দ", 'বনু হাশিম', 'বনু খাযরাজ', 'বনু তামীম'], a: 0, why: "দুধমা হালিমা সাদিয়া ছিলেন বনু সা'দ গোত্রের।" }
+];
+const LETTERS = ['ক', 'খ', 'গ', 'ঘ'];
+const NOTE_DATES = { e1: '২৮ সেপ্টেম্বর', e4: '১ অক্টোবর', e8: '৫ অক্টোবর' };
+const WEEK = ['শ', 'র', 'সো', 'ম', 'বু', 'বৃ', 'শু'];
+
+class Component extends DCLogic {
+  state = {
+    cur: 'e12', theme: null, qi: 0, picked: null, correct: 0,
+    read: ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e10', 'e11'],
+    notes: {
+      e1: 'আবদুল মুত্তালিব নিজের উটের কথা বললেন, আর ঘরের দায়িত্ব রবের ওপর ছেড়ে দিলেন। নিজের সামর্থ্যের সীমা চেনাটাও তাওয়াক্কুলের অংশ।',
+      e4: 'মরুভূমিতে বড় হওয়ার রীতিটা আগে জানতাম না। ভাষা আর পরিবেশ নিয়ে এত সচেতনতা ছিল।',
+      e8: 'প্রথম শব্দটিই "ইকরা", পড়ো। জ্ঞান দিয়েই শুরু। খাদিজা (রা.)-এর সান্ত্বনার কথাগুলো বারবার পড়তে ইচ্ছা করে।'
+    }
+  };
+  setCur = id => this.setState({ cur: id });
+  node(x, read, cur) {
+    const isCur = x.id === cur, isRead = read.has(x.id);
+    return {
+      id: x.id, title: x.title, hijri: x.hijri, greg: x.greg, place: x.place,
+      ageLabel: isNum(x.age) ? 'বয়স ' + x.age : x.age,
+      isCurrent: isCur, showCheck: isRead && !isCur, ariaCurrent: isCur ? 'step' : 'false',
+      rowBg: isCur ? 'var(--surface)' : 'transparent', rowBorder: isCur ? 'var(--line)' : 'transparent',
+      dotBg: isCur ? 'var(--gold-tint)' : isRead ? 'var(--primary)' : 'var(--bg)',
+      dotBorder: isCur ? 'var(--gold)' : isRead ? 'var(--primary)' : 'var(--ink-3)',
+      select: () => this.setCur(x.id)
+    };
+  }
+  renderVals() {
+    const s = this.state, read = new Set(s.read);
+    const theme = s.theme || this.props.theme || 'light';
+    const motion = this.props.motion || 'full';
+    const total = EV.length, readN = EV.filter(x => read.has(x.id)).length;
+    const pct = Math.round(readN / total * 100);
+    const eras = ERAS.map((er, i) => {
+      const evs = EV.filter(x => x.era === i), r = evs.filter(x => read.has(x.id)).length, done = r === evs.length;
+      return {
+        n: bn(i + 1), title: er.title, range: er.range, done,
+        countLabel: bn(evs.length) + 'টি ঘটনা', readLabel: `${bn(r)}/${bn(evs.length)}`,
+        pctW: Math.round(r / evs.length * 100) + '%',
+        circleBg: done ? 'var(--primary)' : 'var(--bg)', circleColor: done ? 'var(--on-primary)' : 'var(--primary-strong)',
+        events: evs.map(x => this.node(x, read, s.cur))
+      };
+    });
+    const idx = EV.findIndex(x => x.id === s.cur), e = EV[idx], prev = EV[idx - 1], next = EV[idx + 1];
+    const note = s.notes[e.id] || '';
+    const ev = {
+      ...e, route: e.route || '', eraN: bn(e.era + 1), eraTitle: ERAS[e.era].title,
+      ageDetail: isNum(e.age) ? e.age + ' বছর' : e.age,
+      keyItems: (e.key || []).map((t, i) => ({ n: bn(i + 1), t })), lessons: e.lessons || [], sources: e.sources || [],
+      hasKey: !!e.key, hasLessons: !!e.lessons, hasSources: !!e.sources, hasArabic: !!e.ar,
+      disputed: e.status === 'disputed', agreed: e.status !== 'disputed',
+      hasRoute: !!e.route, routeLabel: ROUTE_LABEL[e.route] || '', isStub: !e.key,
+      hasPrev: !!prev, noPrev: !prev, hasNext: !!next, prevTitle: prev ? prev.title : '', nextTitle: next ? next.title : '',
+      idxLabel: `ঘটনা ${bn(idx + 1)} / ${bn(total)}`,
+      noteStatus: note ? (NOTE_DATES[e.id] ? 'সংরক্ষিত · ' + NOTE_DATES[e.id] : 'স্বয়ংক্রিয়ভাবে সংরক্ষিত') : 'লেখা শুরু করলেই স্বয়ংক্রিয়ভাবে সংরক্ষিত হবে'
+    };
+    // review
+    const qDone = s.qi >= QS.length, Q = QS[Math.min(s.qi, QS.length - 1)], picked = s.picked, right = picked === Q.a;
+    const advance = () => this.setState(st => ({ qi: st.qi + 1, picked: null, correct: st.correct + (st.picked === QS[st.qi].a ? 1 : 0) }));
+    const rates = right ? [['কঠিন লেগেছে', '২ দিন পর'], ['মনে ছিল', '৫ দিন পর'], ['খুব সহজ', '১২ দিন পর']] : [['পরের প্রশ্ন', 'এটি আসবে আগামীকাল']];
+    const q = {
+      eventTitle: EV.find(x => x.id === Q.ev).title, type: Q.type, text: Q.q, why: Q.why,
+      posLabel: `প্রশ্ন ${bn(Math.min(s.qi + 1, QS.length))} / ${bn(QS.length)}`,
+      picked: picked !== null,
+      fbTitle: right ? 'ঠিক উত্তর' : 'সঠিক উত্তর: ' + Q.opts[Q.a],
+      fbColor: right ? 'var(--primary-strong)' : 'var(--wrong)',
+      rateHint: right ? 'কতটা সহজে মনে পড়ল?' : 'চিন্তা নেই, আবার দেখা হবে।',
+      rates: rates.map(([label, when]) => ({ label, when, go: advance })),
+      options: Q.opts.map((t, i) => {
+        let bg = 'var(--surface)', border = 'var(--line)', op = 1, mark = '', markColor = 'var(--ink-2)';
+        if (picked !== null) {
+          if (i === Q.a) { bg = 'var(--primary-tint)'; border = 'var(--primary)'; mark = '✓'; markColor = 'var(--primary-strong)'; }
+          else if (i === picked) { bg = 'var(--wrong-tint)'; border = 'var(--wrong)'; mark = '✕'; markColor = 'var(--wrong)'; }
+          else op = 0.55;
+        }
+        return { letter: LETTERS[i], text: t, bg, border, op, mark, markColor, disabled: picked !== null, pick: () => this.setState({ picked: i }) };
+      })
+    };
+    const dueLeft = QS.length - s.qi;
+    const streak = qDone ? 8 : 7;
+    const week = WEEK.map((label, i) => {
+      const done = i < 5 || (i === 5 && qDone), today = i === 5 && !qDone;
+      return {
+        label, mark: done ? '✓' : '',
+        bg: done ? 'var(--gold)' : 'transparent',
+        border: done ? 'var(--gold)' : today ? 'var(--gold)' : 'var(--line)',
+        borderStyle: today ? 'dashed' : 'solid',
+        labelColor: i === 5 ? 'var(--ink)' : 'var(--ink-2)'
+      };
+    });
+    const notesList = EV.filter(x => (s.notes[x.id] || '').trim()).reverse()
+      .map(x => ({ title: x.title, text: s.notes[x.id], date: NOTE_DATES[x.id] || 'আজ', open: () => this.setCur(x.id) }));
+    const erasDone = eras.filter(x => x.done).length;
+    return {
+      theme, motion, isLight: theme !== 'dark', isDark: theme === 'dark',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }),
+      eras, ev, note, isRead: read.has(e.id), notRead: !read.has(e.id),
+      onNote: evt => { const v = evt.target.value; this.setState(st => ({ notes: { ...st.notes, [st.cur]: v } })); },
+      onToggleRead: () => this.setState(st => { const r = new Set(st.read); r.has(st.cur) ? r.delete(st.cur) : r.add(st.cur); return { read: [...r] }; }),
+      onPrev: () => prev && this.setCur(prev.id), onNext: () => next && this.setCur(next.id),
+      pctLabel: bn(pct) + '%', pctW: pct + '%', ringDeg: (pct * 3.6) + 'deg',
+      readCountLabel: `${bn(readN)} / ${bn(total)}`, totalLabel: bn(total),
+      erasDoneLabel: `${bn(erasDone)}টি পর্ব সম্পূর্ণ, মোট ${bn(ERAS.length)}টির মধ্যে`,
+      notesCountLabel: `${bn(notesList.length)}টি নিজের নোট`,
+      dueBadge: dueLeft > 0 ? bn(dueLeft) : '', hasDue: dueLeft > 0, dueLabel: bn(dueLeft),
+      dueText: dueLeft > 0 ? `আজ পুনরালোচনার জন্য ${bn(dueLeft)}টি প্রশ্ন অপেক্ষা করছে` : 'আজকের পুনরালোচনা শেষ হয়েছে',
+      notDone: !qDone, reviewDone: qDone, q,
+      dots: QS.map((_, i) => ({ bg: i < s.qi ? 'var(--primary)' : i === s.qi ? 'var(--gold)' : 'var(--line)', w: i === s.qi ? '22px' : '8px' })),
+      resultText: `${bn(QS.length)}টির মধ্যে ${bn(s.correct)}টি সঠিক। পরের পুনরালোচনা আগামীকাল।`,
+      streakLabel: bn(streak), week, notesList,
+      restartReview: () => this.setState({ qi: 0, picked: null, correct: 0 })
+    };
+  }
+}
+</script>
+</body>
+</html>

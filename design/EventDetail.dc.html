@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<article style="display:flex;flex-direction:column;background:var(--bg);color:var(--ink);">
+<div style="position:relative;background:var(--map-sea);border-block-end:1px solid var(--line);">
+<x-import component-from-global-scope="seerah-map" from="./seerah-map.js" view="{{ ev.view }}" route="{{ ev.route }}" places="{{ ev.places }}" highlight="{{ ev.hl }}" height="{{ mapH }}" motion="{{ motion }}" hint-size="100%,300px"></x-import>
+<div role="group" aria-label="দৃশ্য" style="position:absolute;inset-block-start:12px;inset-inline-end:12px;display:flex;padding:2px;border-radius:999px;background:var(--surface);border:1px solid var(--line);box-shadow:0 1px 3px rgba(20,16,10,.08);">
+<span style="min-height:40px;display:flex;align-items:center;padding-inline:14px;border-radius:999px;background:var(--primary);color:var(--on-primary);font:600 13px/1.2 var(--f-ui);">মানচিত্র</span>
+<span aria-disabled="true" title="ভবিষ্যতে যুক্ত হবে" style="min-height:40px;display:flex;align-items:center;gap:6px;padding-inline:12px;border-radius:999px;color:var(--ink-2);font:500 13px/1.2 var(--f-ui);">ভূখণ্ড ৩D<span style="font-size:11px;padding:1px 6px;border-radius:999px;background:var(--surface-2);">শীঘ্রই</span></span>
+</div>
+<sc-if value="{{ ev.hasRoute }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset-block-end:12px;inset-inline-start:12px;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font:500 12.5px/1.3 var(--f-ui);color:var(--ink-2);"><span style="width:20px;height:3px;background:var(--primary);border-radius:2px;"></span>{{ ev.routeLabel }}</div></sc-if>
+</div>
+
+<div ref="{{ contentRef }}" style="width:100%;max-width:680px;margin-inline:auto;box-sizing:border-box;padding-block:24px 40px;padding-inline:20px;display:flex;flex-direction:column;gap:28px;">
+<header style="display:flex;flex-direction:column;gap:14px;">
+<span style="font:600 13px/1.5 var(--f-ui);color:var(--primary-strong);">পর্ব {{ ev.eraN }} · {{ ev.eraTitle }} · {{ ev.idxLabel }}</span>
+<h1 style="margin:0;font:700 28px/1.45 var(--f-ui);color:var(--ink);text-wrap:balance;">{{ ev.title }}</h1>
+<dl style="margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px 16px;padding:14px 16px;border-radius:14px;background:var(--surface);border:1px solid var(--line);">
+<div style="display:flex;flex-direction:column;gap:2px;"><dt style="font:500 12.5px/1.5 var(--f-ui);color:var(--ink-2);">হিজরি সন</dt><dd style="margin:0;font:600 16px/1.5 var(--f-ui);">{{ ev.hijri }}</dd></div>
+<div style="display:flex;flex-direction:column;gap:2px;"><dt style="font:500 12.5px/1.5 var(--f-ui);color:var(--ink-2);">খ্রিস্টাব্দ</dt><dd style="margin:0;font:600 16px/1.5 var(--f-ui);">{{ ev.greg }}</dd></div>
+<div style="display:flex;flex-direction:column;gap:2px;"><dt style="font:500 12.5px/1.5 var(--f-ui);color:var(--ink-2);">নবীজির ﷺ বয়স</dt><dd style="margin:0;font:600 16px/1.5 var(--f-ui);">{{ ev.ageDetail }}</dd></div>
+<div style="display:flex;flex-direction:column;gap:2px;"><dt style="font:500 12.5px/1.5 var(--f-ui);color:var(--ink-2);">স্থান</dt><dd style="margin:0;font:600 16px/1.5 var(--f-ui);">{{ ev.place }}</dd></div>
+</dl>
+<sc-if value="{{ ev.agreed }}" hint-placeholder-val="{{ true }}"><span style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:var(--primary-tint);color:var(--primary-strong);font:600 13.5px/1.6 var(--f-ui);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>সর্বসম্মত</span></sc-if>
+<sc-if value="{{ ev.disputed }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:14px;background:var(--gold-tint);color:var(--ink);">
+<span style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;font:700 13.5px/1.6 var(--f-ui);color:var(--gold-ink);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.5"></path></svg>মতভেদ আছে</span>
+<p style="margin:0;font:400 16px/1.8 var(--f-read);">{{ ev.dispute }}</p>
+</div>
+</sc-if>
+</header>
+
+<sc-if value="{{ ev.hasArabic }}" hint-placeholder-val="{{ false }}">
+<figure style="margin:0;padding:22px 20px 20px;border-radius:16px;background:var(--surface-2);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="stroke:var(--gold);stroke-width:1.4;"><rect x="6" y="6" width="12" height="12"></rect><rect x="6" y="6" width="12" height="12" transform="rotate(45 12 12)"></rect></svg>
+<p lang="ar" dir="rtl" style="margin:0;font:400 30px/2 var(--f-ar);color:var(--ink);">{{ ev.ar }}</p>
+<p style="margin:0;font:400 17px/1.8 var(--f-read);color:var(--ink);text-wrap:pretty;">{{ ev.arTr }}</p>
+<figcaption style="font:500 13px/1.5 var(--f-ui);color:var(--ink-2);">{{ ev.arRef }}</figcaption>
+</figure>
+</sc-if>
+
+<section style="display:flex;flex-direction:column;gap:12px;">
+<h2 style="margin:0;display:flex;align-items:center;gap:12px;font:600 20px/1.5 var(--f-ui);color:var(--ink);">সারসংক্ষেপ<span style="flex:1;height:1px;background:var(--line);"></span></h2>
+<p style="margin:0;font:400 18px/1.85 var(--f-read);color:var(--ink);max-width:36em;text-wrap:pretty;">{{ ev.summary }}</p>
+</section>
+
+<sc-if value="{{ ev.hasKey }}" hint-placeholder-val="{{ true }}">
+<section style="display:flex;flex-direction:column;gap:14px;">
+<h2 style="margin:0;display:flex;align-items:center;gap:12px;font:600 20px/1.5 var(--f-ui);color:var(--ink);">মূল বিষয়সমূহ<span style="flex:1;height:1px;background:var(--line);"></span></h2>
+<ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;">
+<sc-for list="{{ ev.keyItems }}" as="k" hint-placeholder-count="3"><li style="display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;align-items:start;"><span style="margin-block-start:4px;width:28px;height:28px;border-radius:50%;border:1px solid var(--primary);color:var(--primary-strong);display:grid;place-items:center;font:600 14px/1 var(--f-ui);">{{ k.n }}</span><span style="font:400 17px/1.85 var(--f-read);color:var(--ink);text-wrap:pretty;">{{ k.t }}</span></li></sc-for>
+</ol>
+</section>
+</sc-if>
+
+<sc-if value="{{ ev.hasLessons }}" hint-placeholder-val="{{ true }}">
+<section style="display:flex;flex-direction:column;gap:14px;">
+<h2 style="margin:0;display:flex;align-items:center;gap:12px;font:600 20px/1.5 var(--f-ui);color:var(--ink);">শিক্ষা<span style="flex:1;height:1px;background:var(--line);"></span></h2>
+<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;">
+<sc-for list="{{ ev.lessons }}" as="l" hint-placeholder-count="2"><li style="display:grid;grid-template-columns:18px minmax(0,1fr);gap:12px;align-items:start;"><span style="margin-block-start:13px;justify-self:center;width:7px;height:7px;background:var(--gold);transform:rotate(45deg);"></span><span style="font:400 17px/1.85 var(--f-read);color:var(--ink);text-wrap:pretty;">{{ l }}</span></li></sc-for>
+</ul>
+</section>
+</sc-if>
+
+<sc-if value="{{ ev.hasSources }}" hint-placeholder-val="{{ true }}">
+<section style="display:flex;flex-direction:column;gap:8px;">
+<h2 style="margin:0;display:flex;align-items:center;gap:12px;font:600 20px/1.5 var(--f-ui);color:var(--ink);">সূত্র<span style="flex:1;height:1px;background:var(--line);"></span></h2>
+<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;">
+<sc-for list="{{ ev.sources }}" as="s" hint-placeholder-count="3"><li style="display:flex;align-items:center;gap:10px;padding-block:9px;border-block-end:1px solid var(--line);font:500 15px/1.6 var(--f-ui);color:var(--ink-2);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><path d="M4 19.5V5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2zM8 7h8"></path></svg>{{ s }}</li></sc-for>
+</ul>
+</section>
+</sc-if>
+
+<sc-if value="{{ ev.isStub }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:14px 16px;border-radius:14px;border:1px dashed var(--line);font:500 14.5px/1.7 var(--f-ui);color:var(--ink-2);">এই ঘটনার মূল বিষয়, শিক্ষা ও সূত্রসহ বিস্তারিত পাঠ শিগগিরই যুক্ত হবে।</p></sc-if>
+
+<div aria-hidden="true" style="height:18px;background-image:var(--pattern);background-size:18px 18px;opacity:calc(var(--pattern-op) * 2.2);-webkit-mask-image:linear-gradient(90deg,transparent,#000 25%,#000 75%,transparent);mask-image:linear-gradient(90deg,transparent,#000 25%,#000 75%,transparent);"></div>
+
+<section style="display:flex;flex-direction:column;gap:10px;padding:18px;border-radius:16px;background:var(--surface);border:1px solid var(--line);">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;">
+<h2 style="margin:0;font:600 20px/1.5 var(--f-ui);color:var(--ink);">আমার বোঝাপড়া</h2>
+<span style="font:500 12.5px/1.5 var(--f-ui);color:var(--ink-2);">শুধু আপনার জন্য</span>
+</div>
+<label for="note-{{ ev.id }}" style="font:400 14.5px/1.7 var(--f-ui);color:var(--ink-2);">এই ঘটনা থেকে আপনি কী বুঝলেন, নিজের ভাষায় লিখে রাখুন।</label>
+<textarea id="note-{{ ev.id }}" value="{{ note }}" onChange="{{ onNote }}" rows="5" placeholder="যেমন: কোন মুহূর্তটি আপনাকে সবচেয়ে বেশি ভাবিয়েছে?" style="width:100%;box-sizing:border-box;min-height:140px;resize:vertical;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:400 17px/1.85 var(--f-read);"></textarea>
+<span style="display:flex;align-items:center;gap:6px;font:500 12.5px/1.5 var(--f-ui);color:var(--ink-2);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>{{ ev.noteStatus }}</span>
+</section>
+
+<div style="display:flex;flex-direction:column;gap:14px;">
+<sc-if value="{{ notRead }}" hint-placeholder-val="{{ true }}"><button onClick="{{ onToggleRead }}" style="min-height:54px;width:100%;border:0;border-radius:999px;background:var(--primary);color:var(--on-primary);font:600 17px/1.3 var(--f-ui);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>পড়া শেষ</button></sc-if>
+<sc-if value="{{ isRead }}" hint-placeholder-val="{{ false }}"><button onClick="{{ onToggleRead }}" style="min-height:54px;width:100%;border:1px solid var(--primary);border-radius:999px;background:var(--primary-tint);color:var(--primary-strong);font:600 17px/1.3 var(--f-ui);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>পড়া হয়েছে<span style="font:500 13px/1.3 var(--f-ui);color:var(--ink-2);">· অপঠিত করুন</span></button></sc-if>
+<nav aria-label="ঘটনা নেভিগেশন" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+<sc-if value="{{ ev.hasPrev }}" hint-placeholder-val="{{ true }}"><button onClick="{{ onPrev }}" style="min-height:76px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;text-align:start;"><span style="font:500 12.5px/1.4 var(--f-ui);color:var(--ink-2);">‹ আগের ঘটনা</span><span style="font:600 15px/1.5 var(--f-ui);">{{ ev.prevTitle }}</span></button></sc-if>
+<sc-if value="{{ ev.noPrev }}" hint-placeholder-val="{{ false }}"><span></span></sc-if>
+<sc-if value="{{ ev.hasNext }}" hint-placeholder-val="{{ true }}"><button onClick="{{ onNext }}" style="min-height:76px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:4px;text-align:end;"><span style="font:500 12.5px/1.4 var(--f-ui);color:var(--ink-2);">পরের ঘটনা ›</span><span style="font:600 15px/1.5 var(--f-ui);">{{ ev.nextTitle }}</span></button></sc-if>
+</nav>
+</div>
+</div>
+</article>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ev&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;note&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;},&quot;onNote&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(e)=&gt;void&quot;},&quot;isRead&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;boolean&quot;},&quot;notRead&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;boolean&quot;},&quot;onToggleRead&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;()=&gt;void&quot;},&quot;onPrev&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;()=&gt;void&quot;},&quot;onNext&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;()=&gt;void&quot;},&quot;mapH&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;number&quot;},&quot;motion&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  contentRef = React.createRef();
+  componentDidUpdate(prev) {
+    const a = prev.ev && prev.ev.id, b = this.props.ev && this.props.ev.id;
+    const el = this.contentRef.current;
+    if (!a || !b || a === b || !el) return;
+    const reduced = this.props.motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let s = el.parentElement;
+    while (s && !(s.scrollHeight > s.clientHeight && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
+    if (s) s.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+    if (!reduced) el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 700, easing: 'cubic-bezier(.2,0,0,1)' });
+  }
+  renderVals() { return { contentRef: this.contentRef }; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<nav aria-label="প্রধান মেনু" style="flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border-block-start:1px solid var(--line);padding-block:6px 10px;padding-inline:4px;">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+<button aria-current="{{ t.aria }}" style="min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:0;cursor:pointer;color:{{ t.color }};font:{{ t.weight }} 12.5px/1.3 var(--f-ui);">
+<span style="position:relative;display:flex;padding:3px 16px;border-radius:999px;background:{{ t.pill }};">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.d }}"></path></svg>
+<sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset-block-start:-3px;inset-inline-end:6px;min-width:18px;height:18px;padding-inline:5px;box-sizing:border-box;border-radius:9px;background:var(--gold);color:#1E1A16;font:700 11px/18px var(--f-ui);text-align:center;">{{ t.due }}</span></sc-if>
+</span>
+<span>{{ t.label }}</span>
+</button>
+</sc-for>
+</nav>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;timeline&quot;,&quot;review&quot;,&quot;progress&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;due&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const TABS = [
+  ['home', 'হোম', 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'],
+  ['timeline', 'টাইমলাইন', 'M6 3v18M6 6h0M10 6h10M10 12h10M10 18h6'],
+  ['review', 'পুনরালোচনা', 'M3 12a9 9 0 1 0 2.6-6.4L3 8M3 3v5h5M12 8v4l3 2'],
+  ['progress', 'অগ্রগতি', 'M3 21h18M6 18v-6M11 18V6M16 18v-9M21 18V9']
+];
+class Component extends DCLogic {
+  renderVals() {
+    const a = this.props.active ?? 'home';
+    const due = this.props.due ?? '';
+    return {
+      tabs: TABS.map(([id, label, d]) => ({
+        id, label, d,
+        aria: id === a ? 'page' : 'false',
+        color: id === a ? 'var(--primary-strong)' : 'var(--ink-2)',
+        weight: id === a ? 700 : 500,
+        pill: id === a ? 'var(--primary-tint)' : 'transparent',
+        hasBadge: id === 'review' && !!due, due
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

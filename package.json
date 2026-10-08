@@ -1,0 +1,17 @@
+{
+  "name": "seerah-timeline",
+  "private": true,
+  "packageManager": "pnpm@12.9.1",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "build:quran": "pnpm --filter @seerah/content build:quran",
+    "db:generate": "pnpm --filter @seerah/db generate"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}

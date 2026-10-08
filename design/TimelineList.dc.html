@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:28px;">
+<sc-for list="{{ eras }}" as="era" hint-placeholder-count="2">
+<section style="display:flex;flex-direction:column;gap:6px;">
+<header style="position:relative;overflow:hidden;border-radius:14px;background:var(--surface-2);padding:14px 16px;display:flex;flex-direction:column;gap:12px;">
+<div aria-hidden="true" style="position:absolute;inset:0;background-image:var(--pattern);background-size:40px 40px;opacity:var(--pattern-op);pointer-events:none;"></div>
+<div style="position:relative;display:flex;align-items:flex-start;gap:12px;">
+<span style="flex:none;width:34px;height:34px;border-radius:50%;box-sizing:border-box;background:{{ era.circleBg }};border:1px solid var(--primary);color:{{ era.circleColor }};display:grid;place-items:center;font:600 16px/1 var(--f-ui);">{{ era.n }}</span>
+<div style="display:flex;flex-direction:column;gap:1px;min-width:0;">
+<h3 style="margin:0;font:700 18px/1.45 var(--f-ui);color:var(--ink);">{{ era.title }}</h3>
+<span style="font:500 13px/1.6 var(--f-ui);color:var(--ink-2);">{{ era.range }}</span>
+</div>
+</div>
+<div style="position:relative;display:flex;align-items:center;gap:10px;">
+<div style="flex:1;height:5px;border-radius:3px;background:var(--line);overflow:hidden;"><div style="height:100%;width:{{ era.pctW }};background:var(--gold);border-radius:3px;"></div></div>
+<span style="flex:none;font:600 12.5px/1.4 var(--f-ui);color:var(--ink-2);">{{ era.readLabel }} পড়া</span>
+</div>
+</header>
+<ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;">
+<sc-for list="{{ era.events }}" as="n" hint-placeholder-count="3">
+<li style="position:relative;">
+<span aria-hidden="true" style="position:absolute;inset-block:0;inset-inline-start:21px;width:2px;background:var(--line);"></span>
+<button onClick="{{ n.select }}" aria-current="{{ n.ariaCurrent }}" style="position:relative;width:100%;box-sizing:border-box;display:grid;grid-template-columns:28px minmax(0,1fr);gap:14px;align-items:start;padding-block:12px;padding-inline:8px 12px;border-radius:12px;border:1px solid {{ n.rowBorder }};background:{{ n.rowBg }};color:var(--ink);text-align:start;cursor:pointer;min-height:56px;">
+<span style="margin-block-start:3px;justify-self:center;width:22px;height:22px;box-sizing:border-box;border-radius:50%;border:2px solid {{ n.dotBorder }};background:{{ n.dotBg }};display:grid;place-items:center;color:var(--on-primary);">
+<sc-if value="{{ n.showCheck }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></sc-if>
+<sc-if value="{{ n.isCurrent }}" hint-placeholder-val="{{ false }}"><span style="width:8px;height:8px;border-radius:50%;background:var(--gold);"></span></sc-if>
+</span>
+<span style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+<sc-if value="{{ n.isCurrent }}" hint-placeholder-val="{{ false }}"><span style="align-self:flex-start;font:600 12px/1.7 var(--f-ui);color:var(--gold-ink);background:var(--gold-tint);padding-inline:8px;border-radius:999px;">এখন পড়ছেন</span></sc-if>
+<span style="font:600 16px/1.5 var(--f-ui);color:var(--ink);">{{ n.title }}</span>
+<span style="display:flex;flex-wrap:wrap;column-gap:7px;row-gap:0;font:500 13px/1.6 var(--f-ui);color:var(--ink-2);"><span>{{ n.hijri }}</span><span aria-hidden="true">·</span><span>{{ n.greg }}</span><span aria-hidden="true">·</span><span>{{ n.ageLabel }}</span></span>
+<span style="display:flex;align-items:center;gap:5px;font:500 13px/1.6 var(--f-ui);color:var(--ink-2);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>{{ n.place }}</span>
+</span>
+</button>
+</li>
+</sc-for>
+</ol>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;eras&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;Era[]&quot;}}"></script>
+</body>
+</html>
