@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "seerah-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "observability": { "enabled": true },
+  // Routes/custom domains are NOT hardcoded: scripts/render-wrangler.mjs (phase 5) injects
+  // mcp.$DOMAIN from the environment. For local dev the worker runs on localhost.
+  "vars": {
+    "MCP_ORIGIN": "http://localhost:8787",
+    "WEB_ORIGIN": "http://localhost:3000",
+    "ALLOWED_GITHUB_USERS": "",
+    "OWNER_GITHUB_USERS": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "seerah",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/db/migrations"
+    }
+  ],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "seerah-media" }]
+  // Secrets (wrangler secret put): GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
+}

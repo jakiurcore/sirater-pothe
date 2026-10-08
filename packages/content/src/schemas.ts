@@ -153,6 +153,15 @@ export const CreateRouteSchema = z.object({
 })
 
 // ───────────── recall ─────────────
+export const RecallItemSchema = z.object({
+  question: text(400),
+  answer: text(400),
+  distractors: z.array(text(400)).min(2, 'provide at least 2 distractors').max(5),
+}).superRefine((v, ctx) => {
+  const all = [v.answer, ...v.distractors].map((s) => s.trim().toLowerCase())
+  if (new Set(all).size !== all.length) ctx.addIssue({ code: 'custom', path: ['distractors'], message: 'answer and distractors must all be different.' })
+})
+
 export const RecallQuestionSchema = z.object({
   event_slug: SlugSchema,
   lang: LangSchema,
@@ -211,3 +220,16 @@ export function publishBlockers(c: PublishCandidate): string[] {
   if (c.certainty === 'disputed' && !c.translations.some((x) => x.dispute_note)) out.push('Certainty is "disputed" but no dispute_note explains the positions.')
   return out
 }
+
+// ───────────── patch-style translation update (no defaults, so omitted fields stay untouched) ─────────────
+export const UpdateEventTranslationSchema = z.object({
+  lang: LangSchema,
+  title: text(160).optional(),
+  summary: text(1200).optional(),
+  key_details: textList(15, 400).optional(),
+  lessons: textList(10, 600).optional(),
+  dispute_note: text(1500).nullable().optional(),
+  my_reflection: text(3000).nullable().optional(),
+})
+
+export const MAX_SLUG = 80

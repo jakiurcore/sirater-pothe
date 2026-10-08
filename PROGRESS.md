@@ -28,3 +28,16 @@ Open questions for the owner
 1. **Bangla translation licence is unverified.** Tanzil distributes Muhiuddin Khan's translation, but the copyright is the translator's/publisher's, not public domain. It is recorded as `UNVERIFIED` in `datasets.json` and (later) in the DB. Before public launch either confirm permission or swap to a licensed/PD dataset (the loader takes any `{id,name,license,text[][]}`).
 2. Gazetteer coordinates are approximate (hudaybiyyah, hunayn, abwa especially); all flagged `verified: false`.
 3. Is a Bangla ayah translation required at all in v1, or Arabic-only until licensing is settled?
+
+## Phase 2 — MCP server ⏳ IN PROGRESS (usage limit hit mid-phase)
+
+Written, typechecked (not yet tested/run): `apps/mcp/src/*` — OAuthProvider (GitHub login, consent page, allow-list, live role resolution), API tokens (`resolveExternalToken`, hashed in D1), 35 tools (read, event write, place/route, ayah/hadith/source/recall, media, revisions/revert, tokens, publish gate), resources (guidelines, schema, outline), prompt `add_event_from_my_notes`, revision + audit system.
+
+Decisions
+- Used stateless `createMcpHandler` (MCP SDK 2.0.0), NOT `McpAgent`: current docs mark McpAgent deprecated/feature-frozen.
+- `@cloudflare/vitest-pool-workers` is deprecated → `@cloudflare/vitest-plugin` (needs vitest 4.x in apps/mcp).
+- OAuthProvider is built lazily on first request so MCP_ORIGIN comes from env.
+- Added tools beyond spec: `verify_place`, `list_api_tokens`. Seed events need `confirm_verified` to publish.
+- Image "no people" rule is enforced by kind tag + attestation + content sniffing; code cannot detect faces. Owner must still eyeball uploads.
+
+TODO to finish Phase 2: write Vitest tests (workers pool: tools, role gates, revert, publish gate, token auth, Qur'an-text rejection; check SDK's invalid-input error message is clear and that Zod transforms convert to JSON Schema in tools/list); run MCP Inspector against `wrangler dev` with an API token; fix findings.
