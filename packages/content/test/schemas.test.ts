@@ -76,6 +76,21 @@ describe('honorific', () => {
   it('does not touch other people named Muhammad', () => {
     expect(addHonorific('Muhammad ibn Ishaq wrote')).toBe('Muhammad ibn Ishaq wrote')
   })
+  it('never doubles ﷺ, in any existing form', () => {
+    for (const t of ['Muhammad ﷺ', 'Muhammadﷺ', 'Muhammad  ﷺ', 'Muhammad (ﷺ)', 'Muhammad [ﷺ]', 'Prophet Muhammad ﷺ spoke', 'Messenger of Allah ﷺ', 'محمد ﷺ', 'মুহাম্মদ ﷺ', 'মুহাম্মদ (সা.)', 'রাসূলুল্লাহ ﷺ বললেন'])
+      expect(addHonorific(t), t).toBe(t)
+    const once = addHonorific('Muhammad was born. Later Muhammad migrated; Rasulullah and Muhammad ﷺ')
+    expect(once.match(/ﷺ/g)).toHaveLength(4)
+    expect(addHonorific(once)).toBe(once)
+    const t = CreateEventDraftSchema.parse({ slug: 'x', era_slug: 'e', translation: { lang: 'bn', title: 'মুহাম্মদ ﷺ', summary: 'রাসূলুল্লাহ ﷺ এলেন' } })
+    expect(t.translation.title).toBe('মুহাম্মদ ﷺ')
+    expect(t.translation.summary).toBe('রাসূলুল্লাহ ﷺ এলেন')
+  })
+  it('never applies to other people named Muhammad', () => {
+    for (const t of ['Muhammad ibn Maslamah went to Khaybar', 'Muhammad bin Maslamah', 'Muhammad ibn Ishaq wrote', 'Abdullah ibn Muhammad', 'Ali bin Muhammad', 'মুহাম্মদ ইবনে মাসলামা', 'মুহাম্মাদ ইবনে ইসহাক', 'মুহাম্মদ ইবন মাসলামা', 'আব্দুল্লাহ ইবনে মুহাম্মদ'])
+      expect(addHonorific(t), t).toBe(t)
+    expect(addHonorific('Muhammad ibn Maslamah met Muhammad')).toBe('Muhammad ibn Maslamah met Muhammad ﷺ')
+  })
   it('detects missing', () => {
     expect(missingHonorific('Muhammad spoke')).toBe(true)
     expect(missingHonorific('Muhammad ﷺ spoke')).toBe(false)

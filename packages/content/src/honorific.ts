@@ -18,7 +18,7 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // Not matched when already followed by ﷺ (or a common abbreviation), nor when the name is part of another
 // person's name ("Muhammad ibn Ishaq", "মুহাম্মদ ইবনে ইসহাক").
 const NAME_RE = new RegExp(
-  `(${ALL.map(escape).join('|')})(?!\\s*(?:[\\(\\[]?\\s*(?:${PBUH}|সা\\.|স\\.|সাঃ|সা:|সা\\))|ibn\\s|bin\\s|ইবনে|ইবন |বিন |বিন্))`,
+  `(?<!(?:ibn|bin|ইবনে|ইবন|বিন)\\s)(${ALL.map(escape).join('|')})(?!\\s*(?:[\\(\\[]?\\s*(?:${PBUH}|সা\\.|স\\.|সাঃ|সা:|সা\\))|ibn\\s|bin\\s|ইবনে|ইবন |বিন |বিন্))`,
   'g',
 )
 

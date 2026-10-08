@@ -1,5 +1,9 @@
 # PROGRESS
 
+## ⛔ LAUNCH BLOCKERS
+1. **Bangla translation licence** (`bn.bengali`, Muhiuddin Khan via Tanzil) is unverified. Kept for development only. Before production: confirm permission in writing, or swap the dataset (`packages/content/data/translation-bn.json` + `datasets.json`). Never ship with `license` still starting `UNVERIFIED`.
+2. Seed content and gazetteer coordinates are `needs owner verification` / `verified:false`; owner verifies via MCP.
+
 ## Phase 1 — Monorepo, DB schema, Zod, Qur'an dataset ✅ (2026-10-08)
 
 Done
@@ -10,6 +14,8 @@ Done
 - Tests: 61 (Vitest): dataset ↔ independent 114-surah count table, source checksums, ref validation, rules (no Qur'an/hadith text accepted, no-people media kinds, bbox, dispute, honorific, publish gate), migrations applied to in-memory SQLite (node:sqlite) incl. FK/unique/cascade.
 
 Decisions
+- Bismillah check (owner review): the source has it on ayah 1 of 113 surahs (1 and 2–8, 10–114); 9 has none. Build strips 112 (2–8, 10–114, incl. variant spelling in 95/97), keeps 1:1 (it IS the ayah) and 9:1 verbatim; verified against source. An earlier "110" was only an exact-spelling diagnostic.
+- Honorific is skipped after *and* before ibn/bin (Muhammad ibn Maslamah, Abdullah ibn Muhammad); tests cover no-doubling and other-Muhammad cases.
 - **Tanzil quirk found and fixed**: the plain-text export prepends the Bismillah to ayah 1 of 110 surahs (95 and 97 with a variant mark order). The build strips exactly those four words after verifying they are the Bismillah; a test guards it. Without this, 96:1 would have shown the wrong text.
 - Zod 4 (`z.strictObject` for "reject client Qur'an/hadith text", `z.partialRecord` for per-language maps).
 - ﷺ is inserted by Zod transforms on every text field written, and will be applied again at render time. Names followed by `ibn/bin/ইবনে/বিন` are skipped (Muhammad ibn Ishaq).
