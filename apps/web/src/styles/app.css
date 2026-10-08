@@ -342,7 +342,7 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 
 /* ───── map attribution: ODbL requires it; keep it, but with 44px touch targets ───── */
 .mapbox .maplibregl-ctrl-attrib a{display:inline-flex;align-items:center;min-height:44px;padding-inline:4px}
-.mapbox .maplibregl-ctrl-attrib-button{width:44px;height:44px;background-position:center;background-size:20px}
+.mapbox .maplibregl-ctrl-attrib-button{width:44px;height:44px;background-repeat:no-repeat;background-position:center;background-size:20px}
 .mapbox .maplibregl-ctrl-attrib.maplibregl-compact{min-height:44px;min-width:44px;border-radius:22px}
 .mapbox .maplibregl-ctrl-attrib-inner{display:flex;align-items:center;flex-wrap:wrap}
 
