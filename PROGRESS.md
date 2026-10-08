@@ -33,7 +33,7 @@ Open questions for the owner
 
 ## Phase 2 — MCP server ✅ (2026-10-08)
 
-Built (`apps/mcp`): OAuth 2.1 provider (GitHub upstream login, consent page, `ALLOWED_GITHUB_USERS`, live role resolution via `OWNER_GITHUB_USERS`), API tokens (hashed, capped at creator's role, revocable), 29 tools, 3 resources (content-guidelines, schema, timeline outline), prompt `add_event_from_my_notes`, revisions with revert, audit log of every write/failed call.
+Built (`apps/mcp`): OAuth 2.1 provider (originally GitHub upstream login; replaced in Phase 5b by our own D1 login, see below), API tokens (hashed, capped at creator's role, revocable), 29 tools, 3 resources (content-guidelines, schema, timeline outline), prompt `add_event_from_my_notes`, revisions with revert, audit log of every write/failed call.
 
 Tests: 24 integration tests in workerd (real D1/R2/KV via `@cloudflare/vitest-plugin`) calling the Worker over HTTP with bearer tokens: auth (401/403), draft→publish gate (source required, needs_verification gate), disputed note, ayah by reference only (client text rejected, bad ranges), hadith ref-only, editor restrictions, token hash-only storage + revoke, preview token hashing, bbox/[lng,lat] checks, media kind/svg/sniffing rejection, ordering, partial translation update, publish→revert→re-revert refusal, audit log, resources/prompt.
 MCP Inspector (official CLI) against `wrangler dev`: tools/list (29), tools/call, resources/list, prompts/list, error text all OK; OAuth discovery docs (`/.well-known/oauth-protected-resource/mcp`) correct.
@@ -98,3 +98,16 @@ Decisions and findings
 - Arabic and English UI strings were written by me and need a native-speaker read before launch (added to launch blockers). Other languages in `SUPPORTED_LANGS` have no UI catalogue yet and fall back to English.
 - Mobile keeps the design's placement of the language menu and theme toggle (home screen only); desktop has them in the top bar on every page.
 - The theme init script now uses `next/script` (beforeInteractive). React still logs a dev-only "script tag" warning when the language switch re-renders the root layout; harmless in production.
+
+
+## Phase 5 — production deploy, CI/CD, backups ✅ (2026-10-09)
+
+Resources (account `4e29…3b84`): D1 `seerah`, R2 `seerah-tiles` / `seerah-media` / `seerah-backups`, KV `seerah-oauth`, Workers `seerah-mcp`, `seerah-web`, `seerah-backup` (cron 02:00 UTC, 30-day retention, dump through the D1 binding). Domains come from `DOMAIN` via `scripts/render-wrangler.mjs`. Site is noindex + robots disallow until `INDEXING=on`. Production seed = 5 eras + 20 places (unverified), no events. CI: `.github/workflows/ci.yml`, `preview-cleanup.yml`. Details: `SETUP.md`.
+
+## Phase 5b — own login instead of GitHub; design audit ✅ (2026-10-09)
+
+Auth: `/authorize` is now our login page backed by D1 `users` (migration `0001_users.sql`). workers-oauth-provider is kept for the MCP client side. PBKDF2-SHA256, 100k iterations (Workers maximum; argon2id is not viable on Workers: no runtime WASM compilation, memory cost vs CPU limit), per-user salt, constant-time compare, dummy hash for unknown users. Lockout 5 → 15 min, per-IP rate limit (D1 fixed window), CSRF double-submit `__Host-` cookie, generic error, audit log. Optional TOTP (RFC 6238 vectors tested, replay protection). Accounts only via `pnpm user:*` CLI. Live role/disabled state is re-read from `users` on every MCP request, so `user:disable` cuts off sessions and API tokens immediately. All GitHub code, env vars and secrets removed.
+
+Tests: auth package 11 (hashing, TOTP vectors), mcp 37+ (login flow end to end in workerd: success, same page for wrong/unknown, lockout + expiry, disabled, CSRF ×3, rate limit, TOTP incl. replay, escaping). Caveat: the local runtime does not enforce the Workers production PBKDF2 cap (100,000), so that limit is from Cloudflare's documentation, not from a test here.
+
+Design: see `DESIGN_AUDIT.md`. New Playwright spec `e2e/design.spec.ts` (overflow / 44px / clipping checks, visual snapshots at 390 and 1280, dropdown behaviour).

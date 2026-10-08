@@ -5,7 +5,13 @@ import { TOKEN_PREFIX } from '../src/auth/tokens'
 
 export const db = () => getDb(env.DB)
 
+/** Test users. 'stranger' deliberately has no row. */
+export async function ensureUser(username: string, role: 'owner' | 'editor', extra: Partial<typeof s.users.$inferInsert> = {}) {
+  await db().insert(s.users).values({ id: `u-${username}`, username, passwordHash: 'x', role, ...extra }).onConflictDoNothing()
+}
+
 export async function makeToken(login: string, role: 'owner' | 'editor') {
+  if (login === 'owner-user' || login === 'editor-user') await ensureUser(login, login === 'owner-user' ? 'owner' : 'editor')
   const token = TOKEN_PREFIX + crypto.randomUUID().replace(/-/g, '')
   await db().insert(s.apiTokens).values({ id: crypto.randomUUID(), tokenHash: await sha256Hex(token), label: 't', role, owner: login, expiresAt: new Date(Date.now() + 86400000).toISOString() })
   return token

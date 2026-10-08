@@ -2,11 +2,10 @@
 /**
  * Renders deploy-ready wrangler configs from the committed ones + environment. No domain is hardcoded anywhere in git.
  *
- *   DOMAIN=example.com ALLOWED_GITHUB_USERS=alice OWNER_GITHUB_USERS=alice node scripts/render-wrangler.mjs
+ *   DOMAIN=example.com node scripts/render-wrangler.mjs
  *
  * Writes apps/{mcp,web}/wrangler.deploy.jsonc (git-ignored). Deploy with `wrangler deploy -c wrangler.deploy.jsonc`.
  *   DOMAIN                 required. Site = DOMAIN, MCP = mcp.DOMAIN (override with MCP_DOMAIN).
- *   ALLOWED_GITHUB_USERS   required (comma separated).  OWNER_GITHUB_USERS defaults to ALLOWED_GITHUB_USERS.
  *   INDEXING=on            lets search engines in (default: site is noindex + robots disallow).
  *   NAME_SUFFIX            e.g. "-pr-12" for per-PR preview Workers (no custom domain is attached then).
  */
@@ -25,8 +24,6 @@ const read = (app) => JSON.parse(strip(readFileSync(join(root, 'apps', app, 'wra
 
 const domain = need('DOMAIN')
 const mcpDomain = process.env.MCP_DOMAIN || `mcp.${domain}`
-const allowed = need('ALLOWED_GITHUB_USERS')
-const owners = process.env.OWNER_GITHUB_USERS || allowed
 const suffix = process.env.NAME_SUFFIX || ''
 const indexing = process.env.INDEXING === 'on' ? 'on' : 'off'
 const site = `https://${domain}`
@@ -41,7 +38,7 @@ if (!preview) web.routes = [{ pattern: domain, custom_domain: true }]
 
 const api = read('mcp')
 api.name += suffix
-api.vars = { ...api.vars, MCP_ORIGIN: mcp, WEB_ORIGIN: site, ALLOWED_GITHUB_USERS: allowed, OWNER_GITHUB_USERS: owners }
+api.vars = { ...api.vars, MCP_ORIGIN: mcp, WEB_ORIGIN: site }
 if (!preview) api.routes = [{ pattern: mcpDomain, custom_domain: true }]
 
 for (const [app, cfg] of [['web', web], ['mcp', api]]) {

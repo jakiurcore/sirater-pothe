@@ -10,7 +10,7 @@ button:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visibl
 textarea:focus{outline:2px solid var(--primary);outline-offset:1px}
 textarea::placeholder{color:var(--ink-2);opacity:.75}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.skip{position:absolute;inset-inline-start:8px;inset-block-start:-60px;z-index:100;background:var(--primary);color:var(--on-primary);padding:10px 16px;border-radius:999px;text-decoration:none;font:600 14px/1 var(--f-ui)}
+.skip{position:absolute;inset-inline-start:8px;inset-block-start:-60px;z-index:100;background:var(--primary);color:var(--on-primary);min-height:44px;display:flex;align-items:center;padding-inline:18px;border-radius:999px;text-decoration:none;font:600 14px/1 var(--f-ui)}
 .skip:focus{inset-block-start:8px;color:var(--on-primary)}
 @keyframes seerahPulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(2.6);opacity:0}}
 @keyframes seerahEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -36,7 +36,7 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 /* desktop header */
 .deskbar{position:relative;overflow:hidden;flex:none;align-items:center;gap:28px;padding-inline:28px 20px;min-height:68px;border-block-end:1px solid var(--line);background:var(--surface)}
 .deskbar .pat{position:absolute;inset:0;background-image:var(--pattern);background-size:40px 40px;opacity:var(--pattern-op);-webkit-mask-image:linear-gradient(90deg,transparent 20%,#000 60%,transparent);mask-image:linear-gradient(90deg,transparent 20%,#000 60%,transparent);pointer-events:none}
-.brand{position:relative;display:flex;align-items:baseline;gap:10px;text-decoration:none;color:var(--ink)}
+.brand{position:relative;display:flex;align-items:baseline;min-height:44px;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
 .brand:hover{color:var(--ink)}
 .brand b{font:700 20px/1.3 var(--f-ui)}
 .brand span{font:400 14px/1.6 var(--f-ar);color:var(--ink-2)}
@@ -48,10 +48,9 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 
 /* language + theme */
 .lang{position:relative}
-.lang summary{list-style:none;min-height:44px;display:flex;align-items:center;gap:6px;padding-inline:12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 14px/1 var(--f-ui);cursor:pointer}
-.lang summary::-webkit-details-marker{display:none}
-.deskbar .lang summary{background:var(--surface)}
-.lang ul{position:absolute;inset-inline-end:0;inset-block-start:calc(100% + 6px);z-index:30;min-width:180px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 8px 24px rgba(20,16,10,.14)}
+.lang .langbtn{min-height:44px;display:flex;align-items:center;gap:6px;padding-inline:12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 14px/1 var(--f-ui);cursor:pointer}
+.deskbar .lang .langbtn{background:var(--surface)}
+.lang ul{z-index:60;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 8px 24px rgba(20,16,10,.14)}
 .lang li a{display:flex;min-height:44px;align-items:center;padding-inline:12px;border-radius:10px;color:var(--ink);text-decoration:none;font:500 15px/1 var(--f-ui)}
 .lang li a[aria-current="true"]{background:var(--primary-tint);color:var(--primary-strong);font-weight:700}
 .iconbtn{width:44px;height:44px;border-radius:50%;border:0;background:transparent;color:var(--ink);display:grid;place-items:center;cursor:pointer}
@@ -103,7 +102,11 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .eracard .mini .b i{display:block;height:100%;background:var(--gold)}
 .eracard .mini span.r{font:600 12px/1 var(--f-ui);color:var(--ink-2)}
 .circ{width:40px;height:40px;border-radius:50%;border:1px solid var(--primary);display:grid;place-items:center;font:600 17px/1 var(--f-ui);background:var(--bg);color:var(--primary-strong)}
-.circ.done{background:var(--primary);color:var(--on-primary)}
+.circ.done{background:var(--primary)}
+/* doubled class: must out-rank context rules such as `.tl header .top span` that set colour on every span */
+.circ.circ{color:var(--primary-strong);font:600 17px/1 var(--f-ui)}
+.circ.circ.sm{font-size:16px}
+.circ.circ.done{color:var(--on-primary)}
 .circ.sm{width:34px;height:34px;font-size:16px}
 
 /* ───── timeline ───── */
@@ -194,8 +197,10 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .ev>header{display:flex;flex-direction:column;gap:14px}
 .ev .kicker{font:600 13px/1.5 var(--f-ui);color:var(--primary-strong)}
 .ev h1{font:700 28px/1.45 var(--f-ui);color:var(--ink);text-wrap:balance}
-.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px 16px;padding:14px 16px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
-.facts div{display:flex;flex-direction:column;gap:2px}
+.ev{container-type:inline-size;container-name:ev}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;padding:14px 16px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.facts div{display:flex;flex-direction:column;gap:2px;min-width:0}
+@container ev (min-width:520px){.facts{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .facts dt{font:500 12.5px/1.5 var(--f-ui);color:var(--ink-2)}
 .facts dd{font:600 16px/1.5 var(--f-ui)}
 .agreed{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:var(--primary-tint);color:var(--primary-strong);font:600 13.5px/1.6 var(--f-ui)}
@@ -272,7 +277,7 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .dots span{height:8px;border-radius:4px;transition:width .6s ease}
 .qcard{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px 18px;display:flex;flex-direction:column;gap:16px}
 .qev{font:500 13px/1.6 var(--f-ui)}
-.qev a{color:var(--ink-2)}
+.qev a{color:var(--ink-2);display:inline-flex;align-items:center;min-height:44px}
 .qcard h2{font:600 21px/1.55 var(--f-ui);color:var(--ink);text-wrap:pretty}
 .opts{display:flex;flex-direction:column;gap:8px}
 .opt{min-height:56px;width:100%;display:grid;grid-template-columns:32px minmax(0,1fr) 20px;gap:12px;align-items:center;padding:10px 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);text-align:start;font:500 16px/1.5 var(--f-ui);cursor:pointer;transition:background .4s ease,border-color .4s ease,opacity .4s ease}
@@ -334,3 +339,17 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .notecard .nt{font:400 15.5px/1.8 var(--f-read);color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line}
 .backup{display:flex;gap:10px;flex-wrap:wrap}
 .backup .ghost{flex:1 1 180px}
+
+/* ───── map attribution: ODbL requires it; keep it, but with 44px touch targets ───── */
+.mapbox .maplibregl-ctrl-attrib a{display:inline-flex;align-items:center;min-height:44px;padding-inline:4px}
+.mapbox .maplibregl-ctrl-attrib-button{width:44px;height:44px;background-position:center;background-size:20px}
+.mapbox .maplibregl-ctrl-attrib.maplibregl-compact{min-height:44px;min-width:44px;border-radius:22px}
+.mapbox .maplibregl-ctrl-attrib-inner{display:flex;align-items:center;flex-wrap:wrap}
+
+/* ───── 600–899px: the mobile layout, in a centred reading column (the design only defines 390 and 1280) ───── */
+@media (min-width:600px) and (max-width:899.98px){
+  .pagehead{padding-inline:max(20px,calc((100% - 696px)/2))}
+  .tl-wrap{max-width:720px;width:100%;margin-inline:auto}
+  .mapbox{height:340px}
+  .tabbar a{min-height:60px}
+}

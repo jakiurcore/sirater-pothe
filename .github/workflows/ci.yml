@@ -68,7 +68,6 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       DOMAIN: ${{ vars.DOMAIN }}
-      ALLOWED_GITHUB_USERS: ${{ vars.ALLOWED_GITHUB_USERS }}
       NAME_SUFFIX: -pr-${{ github.event.number }}
     steps:
       - uses: actions/checkout@v4
@@ -98,8 +97,6 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       DOMAIN: ${{ vars.DOMAIN }}
-      ALLOWED_GITHUB_USERS: ${{ vars.ALLOWED_GITHUB_USERS }}
-      OWNER_GITHUB_USERS: ${{ vars.OWNER_GITHUB_USERS }}
       INDEXING: ${{ vars.INDEXING }}
     steps:
       - uses: actions/checkout@v4

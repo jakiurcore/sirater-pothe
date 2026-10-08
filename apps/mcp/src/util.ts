@@ -15,6 +15,3 @@ export function randomToken(bytes = 32): string {
   for (const b of a) s += String.fromCharCode(b)
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
-
-export const csv = (s: string | undefined): string[] =>
-  (s ?? '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)

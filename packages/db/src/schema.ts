@@ -235,3 +235,29 @@ export const contentDatasets = sqliteTable('content_datasets', {
   url: text('url'),
   sha256: text('sha256'),
 })
+
+// ───────── users (our own login; no signup, rows are created by the CLI scripts only) ─────────
+export const users = sqliteTable('users', {
+  id: id(),
+  username: text('username').notNull().unique(),
+  /** pbkdf2-sha256$iterations$salt$hash, see @seerah/auth/password. */
+  passwordHash: text('password_hash').notNull(),
+  role: text('role', { enum: ['owner', 'editor'] }).notNull(),
+  /** Base32 TOTP seed when 2FA is enabled. */
+  totpSecret: text('totp_secret'),
+  /** Last accepted TOTP time step (replay protection). */
+  totpLastStep: integer('totp_last_step'),
+  failedAttempts: integer('failed_attempts').notNull().default(0),
+  lockedUntil: text('locked_until'),
+  createdAt: createdAt(),
+  lastLoginAt: text('last_login_at'),
+  /** Set by `pnpm user:disable`: the account can no longer sign in and existing sessions/tokens stop working. */
+  disabledAt: text('disabled_at'),
+})
+
+/** Fixed-window counters (per hashed IP) for rate limiting /authorize. */
+export const rateLimits = sqliteTable('rate_limits', {
+  key: text('key').primaryKey(),
+  windowStart: integer('window_start').notNull(),
+  count: integer('count').notNull(),
+})

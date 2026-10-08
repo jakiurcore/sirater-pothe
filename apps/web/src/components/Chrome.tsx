@@ -1,4 +1,5 @@
 'use client'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useDue, useFmt } from './Providers'
@@ -79,25 +80,82 @@ function remember(l: Lang) {
   try { document.cookie = `seerah-lang=${l}; path=/; max-age=31536000; samesite=lax` } catch { /* cookies blocked */ }
 }
 
+/**
+ * Language dropdown. The list is `position: fixed` and positioned from the button's rect, so no ancestor with
+ * `overflow: hidden` (a modal, a scroll pane) can clip it. It never exceeds the visible viewport (internal scroll),
+ * flips upward when there is more room above, and closes on Escape, outside press, route change and resize.
+ */
 export function LangMenu({ langs }: { langs: Lang[] }) {
   const f = useFmt()
   const pathname = usePathname() ?? `/${f.lang}`
   const rest = pathname.split('/').slice(2).join('/')
+  const [open, setOpen] = useState(false)
+  const [style, setStyle] = useState<React.CSSProperties>({ visibility: 'hidden' })
+  const root = useRef<HTMLDivElement>(null)
+  const btn = useRef<HTMLButtonElement>(null)
+  const list = useRef<HTMLUListElement>(null)
+  const rtl = SUPPORTED_LANGS[f.lang].dir === 'rtl'
+
+  const place = useCallback(() => {
+    const b = btn.current, ul = list.current
+    if (!b || !ul) return
+    const r = b.getBoundingClientRect()
+    const vv = window.visualViewport
+    const vh = vv?.height ?? window.innerHeight, vw = vv?.width ?? window.innerWidth
+    const gap = 6, edge = 8
+    const below = vh - r.bottom - gap - edge, above = r.top - gap - edge
+    const want = ul.scrollHeight + 2
+    const flip = below < Math.min(want, 280) && above > below
+    const room = Math.max(96, flip ? above : below)
+    const width = Math.min(Math.max(180, r.width), vw - edge * 2)
+    // Align the menu's inline-end edge with the button, then keep it fully on screen.
+    let left = rtl ? r.left : r.right - width
+    left = Math.min(Math.max(edge, left), vw - width - edge)
+    setStyle({
+      position: 'fixed', left, width, maxHeight: room, overflowY: 'auto', overscrollBehavior: 'contain',
+      ...(flip ? { bottom: vh - r.top + gap } : { top: r.bottom + gap }), visibility: 'visible',
+    })
+  }, [rtl])
+
+  useLayoutEffect(() => { if (open) place() }, [open, place])
+  useEffect(() => { setOpen(false) }, [pathname])
+  useEffect(() => {
+    if (!open) return
+    const close = (focus = false) => { setOpen(false); if (focus) btn.current?.focus() }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close(true) }
+    const press = (e: Event) => { if (!root.current?.contains(e.target as Node)) close() }
+    const reflow = () => place()
+    document.addEventListener('keydown', key)
+    document.addEventListener('pointerdown', press)
+    window.addEventListener('resize', reflow)
+    window.visualViewport?.addEventListener('resize', reflow)
+    window.addEventListener('scroll', reflow, true)
+    return () => {
+      document.removeEventListener('keydown', key)
+      document.removeEventListener('pointerdown', press)
+      window.removeEventListener('resize', reflow)
+      window.visualViewport?.removeEventListener('resize', reflow)
+      window.removeEventListener('scroll', reflow, true)
+    }
+  }, [open, place])
+
   return (
-    <details className="lang">
-      <summary aria-label={f.t('ui.language')}>
+    <div className="lang" ref={root}>
+      <button type="button" ref={btn} className="langbtn" aria-label={f.t('ui.language')} aria-expanded={open} aria-controls="lang-list" onClick={() => { setStyle({ visibility: 'hidden' }); setOpen((o) => !o) }}>
         <GlobeIcon />
         {SUPPORTED_LANGS[f.lang].name}
         <Icon d="chevron" size={14} sw={2} />
-      </summary>
-      <ul>
-        {langs.map((l) => (
-          <li key={l}>
-            <Link href={`/${l}${rest ? `/${rest}` : ''}`} hrefLang={l} lang={l} aria-current={l === f.lang ? 'true' : undefined} onClick={() => remember(l)}>{SUPPORTED_LANGS[l].name}</Link>
-          </li>
-        ))}
-      </ul>
-    </details>
+      </button>
+      {open && (
+        <ul id="lang-list" ref={list} style={style}>
+          {langs.map((l) => (
+            <li key={l}>
+              <Link href={`/${l}${rest ? `/${rest}` : ''}`} hrefLang={l} lang={l} aria-current={l === f.lang ? 'true' : undefined} onClick={() => remember(l)}>{SUPPORTED_LANGS[l].name}</Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

@@ -7,6 +7,7 @@ const noindex = process.env.INDEXING !== 'on'
 const nextConfig: NextConfig = {
   transpilePackages: ['@seerah/content', '@seerah/db'],
   poweredByHeader: false,
+  devIndicators: false,
   async headers() {
     return [
       {

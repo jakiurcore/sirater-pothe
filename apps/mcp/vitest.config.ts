@@ -11,10 +11,6 @@ export default defineConfig({
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,
-            ALLOWED_GITHUB_USERS: 'owner-user,editor-user',
-            OWNER_GITHUB_USERS: 'owner-user',
-            GITHUB_CLIENT_ID: 'test-client',
-            GITHUB_CLIENT_SECRET: 'test-secret',
             MCP_ORIGIN: 'http://localhost:8787',
             WEB_ORIGIN: 'https://seerah.test',
           },

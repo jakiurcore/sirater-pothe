@@ -3,14 +3,14 @@ import { createMcpHandler } from 'agents/mcp/server'
 import type { AuthProps, Env } from './env'
 import { resolveActor } from './access'
 import { resolveApiToken } from './auth/tokens'
-import { defaultHandler } from './auth/github'
+import { defaultHandler } from './auth/login'
 import { buildServer } from './server'
 
 const apiHandler = {
   async fetch(request: Request, env: Env, rawCtx: ExecutionContext): Promise<Response> {
     const ctx = rawCtx as ExecutionContext & { props: AuthProps }
-    const actor = resolveActor(env, ctx.props)
-    if (!actor) return Response.json({ error: 'forbidden', message: 'This account is no longer on the allow-list.' }, { status: 403 })
+    const actor = await resolveActor(env, ctx.props)
+    if (!actor) return Response.json({ error: 'forbidden', message: 'This account no longer exists or has been disabled.' }, { status: 403 })
     // Stateless: a fresh server per request, bound to the verified actor. Auth is already done by OAuthProvider.
     return createMcpHandler(() => buildServer(env, actor), { route: '/mcp', corsOptions: false, allowedHostnames: [new URL(env.MCP_ORIGIN).hostname] })(request, env, ctx)
   },

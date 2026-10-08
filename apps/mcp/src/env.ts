@@ -8,12 +8,6 @@ export interface Env {
   /** Public origins, e.g. https://mcp.example.com and https://example.com (no trailing slash). */
   MCP_ORIGIN: string
   WEB_ORIGIN: string
-  /** Comma-separated GitHub usernames allowed to sign in. */
-  ALLOWED_GITHUB_USERS: string
-  /** Comma-separated subset of the above who are owners (can publish). Everyone else allowed is an editor. */
-  OWNER_GITHUB_USERS?: string
-  GITHUB_CLIENT_ID: string
-  GITHUB_CLIENT_SECRET: string
 }
 
 export type Role = 'owner' | 'editor'

@@ -173,7 +173,7 @@ test.describe('i18n and RTL', () => {
   test('the language menu switches language, keeps the theme, and is remembered', async ({ page }) => {
     await page.goto('/bn')
     await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; localStorage.setItem('seerah:theme', 'dark') })
-    await page.locator('.lang summary:visible').first().click()
+    await page.locator('.lang button:visible').first().click()
     await page.locator('.lang a[hreflang="en"]:visible').click()
     await expect(page).toHaveURL(/\/en$/)
     await expect(page.getByRole('heading', { level: 1 })).toContainText('The life of the Prophet')

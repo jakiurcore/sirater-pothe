@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { env } from 'cloudflare:workers'
-import { call, db, makeToken, rpc, seedEra } from './helpers'
+import { eq } from 'drizzle-orm'
+import { call, db, ensureUser, makeToken, rpc, seedEra } from './helpers'
 import { schema as s } from '@seerah/db'
 
 let owner: string, editor: string
@@ -14,10 +15,15 @@ beforeAll(async () => {
 })
 
 describe('auth', () => {
-  it('token of a user removed from the allow-list stops working', async () => {
+  it('token of a user with no account (or a disabled one) stops working', async () => {
     const t = await makeToken('stranger', 'owner')
     const r = await rpc(t, 'tools/list')
     expect(r.status).toBe(403)
+    await ensureUser('gone-user', 'editor')
+    const t2 = await makeToken('gone-user', 'editor')
+    expect((await rpc(t2, 'tools/list')).status).toBe(200)
+    await db().update(s.users).set({ disabledAt: new Date().toISOString() }).where(eq(s.users.username, 'gone-user'))
+    expect((await rpc(t2, 'tools/list')).status).toBe(403)
   })
   it('invalid token → 401', async () => expect((await rpc('sk_seerah_nope', 'tools/list')).status).toBe(401))
 })

@@ -24,7 +24,7 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
             <div className="draftbanner" role="note">
               <b>{f.t('preview.banner')}</b>
               <span>{f.t('preview.text')}</span>
-              <span>{f.t('preview.expires', { t: new Date(preview.expiresAt).toLocaleString(lang === 'bn' ? 'bn-BD' : lang) })}</span>
+              <span>{f.t('preview.expires', { t: new Intl.DateTimeFormat(lang === 'bn' ? 'bn-BD' : lang, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }).format(new Date(preview.expiresAt)) })}</span>
               {c.needsVerification ? <span>{f.t('preview.flagged')}</span> : null}
             </div>
           ) : null}

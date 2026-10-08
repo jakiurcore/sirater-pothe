@@ -12,3 +12,4 @@ seed/seed.dev.sql
 apps/web/tiles/*.pmtiles
 seed/seed.prod.sql
 wrangler.deploy.jsonc
+design-audit/live/

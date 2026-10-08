@@ -27,23 +27,19 @@ npx wrangler kv namespace create seerah-oauth   # id into apps/mcp/wrangler.json
 
 | Secret | Where | How |
 |---|---|---|
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | Worker `seerah-mcp` | `cd apps/mcp && npx wrangler secret put GITHUB_CLIENT_ID -c wrangler.deploy.jsonc` (same for `_SECRET`). Typed at the prompt, never stored in files. |
 | `CLOUDFLARE_API_TOKEN` | GitHub Actions secret | Token with Workers Scripts:Edit, D1:Edit, R2:Edit, Workers KV:Edit, Zone:Read, Workers Routes:Edit (account + the zone). |
 | `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secret | `wrangler whoami` |
 
-There are **no other secrets**: preview tokens are stored only as SHA-256 hashes in D1, and the OAuth provider encrypts its
-grants itself with keys kept in KV.
+The MCP server has **no secrets at all**: logins live in D1 (`users`: PBKDF2 password hashes, optional TOTP seed), preview tokens
+are stored only as SHA-256 hashes, and the OAuth provider encrypts its grants itself with keys kept in KV.
 
-GitHub Actions **variables** (Settings → Secrets and variables → Actions → Variables): `DOMAIN`, `ALLOWED_GITHUB_USERS`,
-`OWNER_GITHUB_USERS`, `INDEXING` (leave unset until launch). Create an Actions environment named `production`.
-
-GitHub OAuth App: callback URL `https://mcp.<DOMAIN>/callback`; homepage `https://<DOMAIN>`.
+GitHub Actions **variables** (Settings → Secrets and variables → Actions → Variables): `DOMAIN`, `INDEXING` (leave unset until launch). Create an Actions environment named `production`.
 
 ## First deploy (exact commands)
 
 ```bash
 pnpm install
-export DOMAIN=example.com ALLOWED_GITHUB_USERS=alice OWNER_GITHUB_USERS=alice
+export DOMAIN=example.com
 node scripts/render-wrangler.mjs
 
 # database
@@ -55,15 +51,34 @@ pnpm --filter @seerah/db seed:sql --prod        # eras + gazetteer places only (
 scripts/build-tiles.sh
 (cd apps/web && npx wrangler r2 object put seerah-tiles/arabia.pmtiles --file tiles/arabia.pmtiles --remote)
 
-# workers: mcp first, then secrets, then web, then backup
+# workers: mcp, web, backup
 (cd apps/mcp && npx wrangler deploy -c wrangler.deploy.jsonc)
-(cd apps/mcp && npx wrangler secret put GITHUB_CLIENT_ID -c wrangler.deploy.jsonc && npx wrangler secret put GITHUB_CLIENT_SECRET -c wrangler.deploy.jsonc)
 (cd apps/web && pnpm exec opennextjs-cloudflare build && pnpm exec opennextjs-cloudflare deploy -c wrangler.deploy.jsonc)
 (cd apps/backup && npx wrangler deploy)
 ```
 
 Custom domains (`<DOMAIN>` and `mcp.<DOMAIN>`) are attached by the deploy; the zone must be on the same account and must not
 already have DNS records with those names.
+
+## Users (there is no signup)
+
+Accounts are created only by CLI scripts, run on your machine against the **remote** D1 (add `--local` for the dev database).
+All prompts are interactive; passwords are never accepted as arguments and never appear in process arguments (SQL goes through a
+0600 temp file).
+
+```bash
+pnpm user:create            # username, role (owner can publish, editor cannot), password twice
+pnpm user:enable-2fa        # prints a QR code in the terminal, asks for a confirming code
+pnpm user:reset-password    # also clears a lockout
+pnpm user:disable-2fa       # lost phone
+pnpm user:disable           # add --enable to undo; takes effect immediately for sessions and API tokens
+```
+
+Sign-in is the `/authorize` page of the MCP server (Bangla + English): username, password, authenticator code if enabled.
+Lockout: 5 wrong attempts lock the account for 15 minutes. `/authorize` is also rate limited per IP (10 POSTs / 15 min).
+Every attempt is written to `audit_log` (`auth.login`, `auth.csrf`, `auth.rate_limited`, `cli.user.*`).
+Passwords use PBKDF2-SHA256 with 100,000 iterations (the Workers maximum) and a per-user random salt; see
+`packages/auth/src/password.ts` for why not argon2id.
 
 ## Launch
 

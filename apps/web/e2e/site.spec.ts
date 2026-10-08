@@ -132,7 +132,11 @@ test.describe('SEO and plumbing', () => {
     await expect(page.locator('meta[property="og:image"]')).toHaveCount(1)
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/bn\/events\/first-revelation-in-hira$/)
     expect(await (await request.get('/sitemap.xml')).text()).toContain('/bn/sitemap.xml')
-    expect(await (await request.get('/robots.txt')).text()).toContain('Disallow: /*/preview/')
+    // Pre-launch (INDEXING is not "on"): everything is disallowed and noindex'd.
+    const robots = await request.get('/robots.txt')
+    expect(await robots.text()).toMatch(/Disallow: \/\s*$/m)
+    expect(robots.headers()['x-robots-tag']).toContain('noindex')
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/)
     const range = await request.get('/tiles/arabia.pmtiles', { headers: { Range: 'bytes=0-6' } })
     expect(range.status()).toBe(206)
     expect((await range.body()).toString()).toBe('PMTiles')
