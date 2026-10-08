@@ -10,3 +10,5 @@ dist
 seed/seed.sql
 seed/seed.dev.sql
 apps/web/tiles/*.pmtiles
+seed/seed.prod.sql
+wrangler.deploy.jsonc

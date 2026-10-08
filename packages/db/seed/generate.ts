@@ -12,6 +12,7 @@ import { GAZETTEER_SEED } from '@seerah/content/gazetteer'
 import { getAyat, getTranslationMeta, ARABIC_DATASET } from '@seerah/content/quran'
 
 const dev = process.argv.includes('--dev')
+const prod = process.argv.includes('--prod')
 const q = (v: string | number | boolean | null | undefined): string =>
   v === null || v === undefined ? 'NULL' : typeof v === 'number' ? String(v) : typeof v === 'boolean' ? (v ? '1' : '0') : `'${v.replace(/'/g, "''")}'`
 const out: string[] = []
@@ -38,6 +39,14 @@ for (const p of GAZETTEER_SEED) {
   const id = `seed-place-${p.slug}`
   ins('places', { id, slug: p.slug, type: p.type, lat: p.lat, lng: p.lng, verified: false })
   for (const [lang, name] of Object.entries(p.names)) ins('place_translations', { place_id: id, lang, name })
+}
+
+// --prod: eras + gazetteer places ONLY. No routes, sources or events; real content comes through the MCP server.
+if (prod) {
+  const f = new URL('./seed.prod.sql', import.meta.url)
+  writeFileSync(f, out.join('\n') + '\n')
+  console.log(`wrote ${f.pathname} (${out.length} statements, PROD: eras + places only, places unverified)`)
+  process.exit(0)
 }
 
 // ── routes (approximate; GeoJSON [lng, lat]) ──

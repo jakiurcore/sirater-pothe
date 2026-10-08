@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "seerah",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "f4474a63-eab5-42f3-be84-242badc27e20",
       "migrations_dir": "../../packages/db/migrations"
     }
   ],

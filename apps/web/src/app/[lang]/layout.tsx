@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
   const f = makeFmt(lang, getMessages(lang))
   const origin = process.env.WEB_ORIGIN
   return {
+    robots: process.env.INDEXING === 'on' ? undefined : { index: false, follow: false },
     metadataBase: origin ? new URL(origin) : undefined,
     title: { default: `${f.t('app.name')} · ${f.t('app.nameAr')}`, template: `%s · ${f.t('app.name')}` },
     description: f.t('app.description'),

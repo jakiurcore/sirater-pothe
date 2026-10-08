@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  check:
+    name: Lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  e2e:
+    name: Playwright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Map tiles (cached; Protomaps extract of the Arabian Peninsula)
+        id: tiles
+        uses: actions/cache@v4
+        with:
+          path: apps/web/tiles/arabia.pmtiles
+          key: tiles-arabia-v1
+      - name: Build tiles
+        if: steps.tiles.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL https://github.com/protomaps/go-pmtiles/releases/download/v1.30.1/go-pmtiles_1.30.1_Linux_x86_64.tar.gz | tar -xz -C /usr/local/bin pmtiles
+          scripts/build-tiles.sh
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Local D1 (dev seed, local only) and e2e
+        working-directory: apps/web
+        run: |
+          pnpm --filter @seerah/db seed:sql --dev
+          pnpm db:local
+          pnpm e2e:setup
+          pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-traces, path: apps/web/test-results }
+
+  preview:
+    name: Preview deploy (web)
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [check]
+    runs-on: ubuntu-latest
+    permissions: { pull-requests: write }
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DOMAIN: ${{ vars.DOMAIN }}
+      ALLOWED_GITHUB_USERS: ${{ vars.ALLOWED_GITHUB_USERS }}
+      NAME_SUFFIX: -pr-${{ github.event.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/render-wrangler.mjs
+      # Preview Workers read the production D1 (the web app never writes) on a *.workers.dev URL, always noindex.
+      # The MCP server is NOT previewed per PR: it writes, so it is never pointed at production data from a PR.
+      - name: Deploy preview
+        working-directory: apps/web
+        run: pnpm exec opennextjs-cloudflare build && pnpm exec opennextjs-cloudflare deploy -c wrangler.deploy.jsonc | tee deploy.log
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const url = require('fs').readFileSync('apps/web/deploy.log', 'utf8').match(/https:\/\/\S+\.workers\.dev/)?.[0]
+            if (url) await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body: `Preview: ${url}` })
+
+  deploy:
+    name: Deploy production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, e2e]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DOMAIN: ${{ vars.DOMAIN }}
+      ALLOWED_GITHUB_USERS: ${{ vars.ALLOWED_GITHUB_USERS }}
+      OWNER_GITHUB_USERS: ${{ vars.OWNER_GITHUB_USERS }}
+      INDEXING: ${{ vars.INDEXING }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/render-wrangler.mjs
+      - name: D1 migrations (before any code that needs them)
+        working-directory: apps/mcp
+        run: pnpm exec wrangler d1 migrations apply seerah --remote
+      - name: Deploy MCP
+        working-directory: apps/mcp
+        run: pnpm exec wrangler deploy -c wrangler.deploy.jsonc
+      - name: Deploy web
+        working-directory: apps/web
+        run: pnpm exec opennextjs-cloudflare build && pnpm exec opennextjs-cloudflare deploy -c wrangler.deploy.jsonc
+      - name: Deploy backup cron
+        working-directory: apps/backup
+        run: pnpm exec wrangler deploy
