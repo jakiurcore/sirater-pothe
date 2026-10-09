@@ -18,7 +18,7 @@ export function MapStageProvider({ children }: { children: ReactNode }) {
 /** Rendered by each event page: tells the persistent map what to show. */
 export function MapSync({ data }: { data: MapData }) {
   const { setData } = useContext(MapCtx)
-  const key = `${data.eventId}|${data.markers.length}|${data.route?.slug ?? ''}`
+  const key = `${data.eventId}|${data.markers.map((m) => `${m.slug}:${m.role}`).join(',')}|${data.route?.slug ?? ''}|${data.focus?.zoom ?? ''}`
   useEffect(() => { setData(data) }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   return null
 }

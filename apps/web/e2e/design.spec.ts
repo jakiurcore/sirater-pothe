@@ -25,6 +25,9 @@ async function setup(page: Page, opts: { state?: object | null; theme?: 'dark' }
 }
 async function settle(page: Page) {
   await page.evaluate(() => document.fonts.ready)
+  // Lazy pictures only load near the viewport: walk down the page once so full-page captures and measurements see them.
+  for (const f of await page.locator('figure.pic').all()) { await f.scrollIntoViewIfNeeded(); await f.locator('img').evaluate((i: HTMLImageElement) => i.decode().catch(() => {})) }
+  await page.evaluate(() => scrollTo(0, 0))
   await page.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' })
   await page.waitForTimeout(400)
 }
@@ -39,6 +42,8 @@ const PAGES: { id: string; path: string; opts?: { state?: null; theme?: 'dark' }
   { id: 'progress', path: '/bn/progress' },
   { id: 'progress-empty', path: '/bn/progress', opts: { state: null } },
   { id: 'event-rtl', path: '/ar/events/hijrah-to-madinah' },
+  { id: 'event-media', path: '/bn/events/battle-of-badr' },
+  { id: 'event-media-preview', path: `/bn/preview/e2e-media?token=${TOKENS.media}` },
   { id: 'long-title', path: `/bn/preview/e2e-long-title?token=${TOKENS.long}` },
 ]
 

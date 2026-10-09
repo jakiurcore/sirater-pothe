@@ -53,6 +53,7 @@
   "event.sources": "المصادر",
   "event.ayat": "القرآن",
   "event.hadith": "الحديث",
+  "event.gallery": "الصور",
   "ayah.ref": "القرآن {s}:{a}",
   "event.stub": "ستُضاف النقاط والدروس والمصادر لهذا الحدث قريبًا.",
   "event.verification": "لم يُراجَع هذا الحدث بعد.",

@@ -35,16 +35,16 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - name: Map tiles (cached; Protomaps extract of the Arabian Peninsula)
+      - name: Map tiles (cached; Protomaps extracts: Arabian Peninsula z0-10 + detailed Makkah z0-15)
         id: tiles
         uses: actions/cache@v4
         with:
-          path: apps/web/tiles/arabia.pmtiles
-          key: tiles-arabia-v1
+          path: apps/web/tiles/*.pmtiles
+          key: tiles-arabia-makkah-v2
       - name: Build tiles
         if: steps.tiles.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL https://github.com/protomaps/go-pmtiles/releases/download/v1.30.1/go-pmtiles_1.30.1_Linux_x86_64.tar.gz | tar -xz -C /usr/local/bin pmtiles
+          curl -fsSL https://github.com/protomaps/go-pmtiles/releases/download/v1.31.2/go-pmtiles_1.31.2_Linux_x86_64.tar.gz | sudo tar -xz -C /usr/local/bin pmtiles
           scripts/build-tiles.sh
       - run: pnpm exec playwright install --with-deps chromium
       - name: Local D1 (dev seed, local only) and e2e

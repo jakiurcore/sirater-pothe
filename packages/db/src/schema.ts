@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, primaryKey, index, uniqueIndex, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 const id = () => text('id').primaryKey()
@@ -24,10 +24,15 @@ export const eraTranslations = sqliteTable('era_translations', {
 export const places = sqliteTable('places', {
   id: id(),
   slug: text('slug').notNull().unique(),
-  type: text('type', { enum: ['city', 'mountain', 'cave', 'valley', 'plain', 'battlefield', 'region', 'site'] }).notNull(),
+  /** region ≈ zoom 6, city ≈ 12, site ≈ 17 (see @seerah/content geo). */
+  type: text('type', { enum: ['region', 'city', 'site'] }).notNull(),
   lat: real('lat').notNull(),
   lng: real('lng').notNull(),
   verified: integer('verified', { mode: 'boolean' }).notNull().default(false),
+  /** The containing place: a site's city, a city's region. */
+  parentPlaceId: text('parent_place_id').references((): AnySQLiteColumn => places.id, { onDelete: 'set null' }),
+  /** Optional camera zoom for this place; otherwise the type's default. */
+  zoomOverride: integer('zoom_override'),
 })
 export const placeTranslations = sqliteTable('place_translations', {
   placeId: text('place_id').notNull().references(() => places.id, { onDelete: 'cascade' }),
@@ -57,6 +62,7 @@ export const events = sqliteTable('events', {
   hijriYear: integer('hijri_year'),
   gregorianApprox: integer('gregorian_approx'),
   prophetAge: integer('prophet_age'),
+  /** DEPRECATED: mirror of the primary row in event_places, kept in sync for readers that predate the join table. Read event_places. */
   placeId: text('place_id').references(() => places.id, { onDelete: 'set null' }),
   routeId: text('route_id').references(() => routes.id, { onDelete: 'set null' }),
   certainty: text('certainty', { enum: ['agreed', 'disputed'] }).notNull().default('agreed'),
@@ -67,6 +73,19 @@ export const events = sqliteTable('events', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [index('events_status_order').on(t.status, t.orderIndex), index('events_era').on(t.eraId)])
+
+/** Places of an event: one `primary` (the map flies to it) plus related / route_start / route_end. */
+export const eventPlaces = sqliteTable('event_places', {
+  eventId: text('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  placeId: text('place_id').notNull().references(() => places.id, { onDelete: 'cascade' }),
+  role: text('role', { enum: ['primary', 'related', 'route_start', 'route_end'] }).notNull().default('related'),
+  orderIndex: integer('order_index').notNull().default(0),
+}, (t) => [
+  primaryKey({ columns: [t.eventId, t.placeId] }),
+  // The database itself refuses a second primary place for the same event.
+  uniqueIndex('event_places_one_primary').on(t.eventId).where(sql`${t.role} = 'primary'`),
+  index('event_places_place').on(t.placeId),
+])
 
 export const eventTranslations = sqliteTable('event_translations', {
   eventId: text('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
@@ -172,12 +191,21 @@ export const media = sqliteTable('media', {
   mime: text('mime').notNull(),
   bytes: integer('bytes').notNull(),
   eventId: text('event_id').references(() => events.id, { onDelete: 'set null' }),
+  /** Where it sits in the event page. Structured only: never markers inside text. */
+  placement: text('placement', { enum: ['hero', 'after_summary', 'in_key_details', 'before_lessons', 'gallery'] }).notNull().default('gallery'),
+  /** 0-based key detail the picture follows; only for placement in_key_details. */
+  afterKeyDetailIndex: integer('after_key_detail_index'),
+  orderIndex: integer('order_index').notNull().default(0),
+  credit: text('credit'),
+  width: integer('width'),
+  height: integer('height'),
   createdAt: createdAt(),
-})
+}, (t) => [index('media_event').on(t.eventId)])
 export const mediaAlt = sqliteTable('media_alt', {
   mediaId: text('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
   lang: text('lang').notNull(),
   alt: text('alt').notNull(),
+  caption: text('caption'),
 }, (t) => [primaryKey({ columns: [t.mediaId, t.lang] })])
 
 // ───────── history, audit, access ─────────

@@ -32,9 +32,13 @@ export function registerAdminTools(server: McpServer, ctx: ToolCtx) {
     }
   })
 
+  const dropFiles = async (keys: string[]) => {
+    if (keys.length) await ctx.env.MEDIA.delete(keys)
+  }
+
   defineTool(server, ctx, 'revert_revision', {
     title: 'Revert revision',
-    description: 'Undo one change by restoring the state before it (for an event: its fields, translations, citations, ayat, hadith and questions). Reverting a creation deletes the draft. Writes a new revision, so a revert can itself be reverted. Owner only unless both the current and the restored state are drafts.',
+    description: 'Undo one change by restoring the state before it (for an event: its fields, translations, citations, ayat, hadith, questions, places and pictures). Reverting a creation deletes the draft. Writes a new revision, so a revert can itself be reverted. Owner only unless both the current and the restored state are drafts.',
     access: 'write', destructive: true,
     input: z.object({ revision_id: z.string().min(8).max(64) }),
   }, async ({ revision_id }) => {
@@ -57,8 +61,10 @@ export function registerAdminTools(server: McpServer, ctx: ToolCtx) {
       await db.batch([
         db.insert(s.revisions).values({ id: newRev, entity, entityId: rev.entityId, action: 'revert', beforeJson: current, afterJson: null, actor: actor.login }),
         db.update(s.revisions).set({ revertedBy: actor.login }).where(eq(s.revisions.id, rev.id)),
+        db.delete(s.media).where(eq(s.media.eventId, rev.entityId)), // the draft's pictures go with it (media_alt cascades)
         db.delete(s.events).where(eq(s.events.id, rev.entityId)),
       ])
+      await dropFiles((current.media ?? []).map((m: any) => m.media.r2Key))
       return { ok: true, reverted: rev.id, result: 'deleted draft event', revision_id: newRev }
     }
     if (!current) throw new ToolError('That item no longer exists, so there is nothing to restore into.')
@@ -67,6 +73,11 @@ export function registerAdminTools(server: McpServer, ctx: ToolCtx) {
       db.update(s.revisions).set({ revertedBy: actor.login }).where(eq(s.revisions.id, rev.id)),
       ...restoreStatements(db, entity, before),
     ] as never)
+    if (entity === 'event' && before.media !== undefined) {
+      // Pictures that existed after the change but not before it are gone from the database: remove their files too.
+      const keep = new Set(before.media.map((m: any) => m.media.r2Key))
+      await dropFiles((current.media ?? []).map((m: any) => m.media.r2Key).filter((k: string) => !keep.has(k)))
+    }
     return { ok: true, reverted: rev.id, restored_to: `state before "${rev.action}" by ${rev.actor} at ${rev.createdAt}`, revision_id: newRev }
   })
 

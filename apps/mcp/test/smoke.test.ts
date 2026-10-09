@@ -13,7 +13,7 @@ describe('transport + auth', () => {
     const r = await rpc(owner, 'tools/list')
     console.log(r.status, r.raw.slice(0, 600))
     expect(r.status).toBe(200)
-    expect(r.body.result.tools.length).toBe(29)
+    expect(r.body.result.tools.length).toBe(35)
   })
   it('list_eras works', async () => {
     const r = await call(owner, 'list_eras', {})

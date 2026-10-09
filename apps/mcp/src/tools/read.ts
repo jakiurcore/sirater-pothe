@@ -1,9 +1,9 @@
 import { z } from 'zod'
 import { and, eq, sql, asc } from 'drizzle-orm'
 import { schema as s } from '@seerah/db'
-import { LangSchema, SlugSchema, StatusSchema, publishBlockers, DEFAULT_LANG } from '@seerah/content'
+import { LangSchema, SlugSchema, StatusSchema, DEFAULT_LANG } from '@seerah/content'
 import { defineTool, type ToolCtx } from './kit'
-import { eraBySlug, eventBySlug, eventView, loadEventAggregate, titles } from '../data'
+import { blockersFor, eraBySlug, eventBySlug, eventView, loadEventAggregate, titles } from '../data'
 import type { McpServer } from '@modelcontextprotocol/server'
 
 const esc = (q: string) => q.replace(/[\\%_]/g, (c) => '\\' + c)
@@ -64,14 +64,14 @@ export function registerReadTools(server: McpServer, ctx: ToolCtx) {
 
   defineTool(server, ctx, 'get_event', {
     title: 'Get event',
-    description: 'Full event: translation, place, route, sources, ayat (with server-fetched text), hadith refs, recall questions, readiness for publishing.',
+    description: 'Full event: translation, ALL places with their roles (primary / related / route_start / route_end), route, sources, ayat (with server-fetched text), hadith refs, recall questions, readiness for publishing.',
     access: 'read',
     input: z.object({ slug: SlugSchema, lang: LangSchema.optional() }),
   }, async ({ slug, lang }) => {
     const e = await eventBySlug(db, slug)
     const view = await eventView(db, e.id, lang)
     const agg = (await loadEventAggregate(db, e.id))!
-    return { ...view, publish_blockers: publishBlockers({ certainty: e.certainty, sourceCount: agg.sources.length, translations: agg.translations.map((t) => ({ lang: t.lang, title: t.title, summary: t.summary, dispute_note: t.disputeNote })) }) }
+    return { ...view, publish_blockers: blockersFor(agg) }
   })
 
   defineTool(server, ctx, 'list_eras', {
@@ -99,7 +99,7 @@ export function registerReadTools(server: McpServer, ctx: ToolCtx) {
       const agg = (await loadEventAggregate(db, r.id))!
       out.push({
         slug: r.slug, title: tt.get(r.id) ?? null, needs_verification: r.needsVerification, updated_at: r.updatedAt,
-        blockers: publishBlockers({ certainty: r.certainty, sourceCount: agg.sources.length, translations: agg.translations.map((t) => ({ lang: t.lang, title: t.title, summary: t.summary, dispute_note: t.disputeNote })) }),
+        blockers: blockersFor(agg),
       })
     }
     return { count: out.length, drafts: out }

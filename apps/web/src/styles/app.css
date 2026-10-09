@@ -14,8 +14,8 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .skip:focus{inset-block-start:8px;color:var(--on-primary)}
 @keyframes seerahPulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(2.6);opacity:0}}
 @keyframes seerahEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-[data-motion="reduced"] *{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+[data-motion="reduced"] *,[data-motion="reduced"] *::before,[data-motion="reduced"] *::after{animation:none!important;transition:none!important}
 
 /* ───── app frame ───── */
 .app{min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink)}
@@ -183,6 +183,7 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .maplbl.sea{font-weight:500;font-size:12px;color:var(--map-sea-ink);text-shadow:none}
 .mapmk{position:relative;width:0;height:0}
 .mapmk i{position:absolute;inset-inline-start:-4.5px;inset-block-start:-4.5px;width:9px;height:9px;border-radius:50%;background:var(--map-marker);border:2px solid var(--map-halo);box-sizing:content-box;translate:-2px -2px}
+.mapmk.rel i{background:var(--surface);border-color:var(--map-marker)}
 .mapmk.hl i{width:12px;height:12px;inset-inline-start:-6px;inset-block-start:-6px;background:var(--gold)}
 .mapmk.hl::after{content:"";position:absolute;inset-inline-start:-7px;inset-block-start:-7px;width:14px;height:14px;border-radius:50%;border:1.5px solid var(--gold);animation:seerahPulse 3.2s cubic-bezier(.2,0,0,1) infinite}
 .mapfail{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;font:500 14px/1.7 var(--f-ui);color:var(--ink-2)}
@@ -353,3 +354,14 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
   .mapbox{height:340px}
   .tabbar a{min-height:60px}
 }
+
+/* ───── event pictures (placement-driven; no people, ever) ───── */
+.pics{display:flex;flex-direction:column;gap:16px}
+.pics.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:16px;align-items:start}
+.pic{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+.pic .frame{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--surface-2);min-height:96px}
+.pic img{display:block;width:100%;height:auto;max-width:100%}
+.pic figcaption{display:flex;flex-direction:column;gap:2px;padding-inline:4px;font:500 13px/1.6 var(--f-ui);color:var(--ink-2)}
+.pic figcaption small{font:400 12px/1.5 var(--f-ui);color:var(--ink-3)}
+.keys li.keypic{display:block;margin-inline-start:42px}
+@media (max-width:420px){.keys li.keypic{margin-inline-start:0}}

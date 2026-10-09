@@ -4,10 +4,10 @@ import type { McpServer } from '@modelcontextprotocol/server'
 import { schema as s } from '@seerah/db'
 import {
   CertaintySchema, CreateEventDraftSchema, EventTranslationSchema, LangSchema, SlugSchema, UpdateEventSchema,
-  UpdateEventTranslationSchema, DEFAULT_LANG, publishBlockers, addHonorific,
+  UpdateEventTranslationSchema, DEFAULT_LANG, addHonorific,
 } from '@seerah/content'
 import { assertCanEdit, defineTool, type ToolCtx } from './kit'
-import { eraBySlug, eventBySlug, loadEventAggregate, maxOrder, placeBySlug, routeBySlug, touch, withRevision, titles } from '../data'
+import { blockersFor, eraBySlug, eventBySlug, linksOf, loadEventAggregate, maxOrder, placeBySlug, placeLinkStatements, planRemovePlace, planSetPrimary, routeBySlug, touch, withRevision, titles } from '../data'
 import { ToolError, nowIso, randomToken, sha256Hex, uuid } from '../util'
 
 const GAP = 1024
@@ -18,7 +18,7 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
 
   defineTool(server, ctx, 'create_event_draft', {
     title: 'Create event draft',
-    description: 'Create a new DRAFT event with its first translation. Search for duplicates first. It is appended at the end of the timeline; use set_event_order to place it. Attach sources, place, ayat and questions afterwards.',
+    description: 'Create a new DRAFT event with its first translation. Search for duplicates first. It is appended at the end of the timeline; use set_event_order to place it. place_slug (optional) becomes the PRIMARY place; add more with add_event_place. Attach sources, ayat and questions afterwards.',
     access: 'write',
     input: CreateEventDraftSchema,
   }, async (a) => {
@@ -48,13 +48,14 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
           eventId: id, lang: t.lang, title: t.title, summary: t.summary, keyDetails: t.key_details ?? [], lessons: t.lessons ?? [],
           disputeNote: t.dispute_note ?? null, myReflection: t.my_reflection ?? null, status: 'draft',
         }),
+        ...(place ? [db.insert(s.eventPlaces).values({ eventId: id, placeId: place.id, role: 'primary', orderIndex: 0 })] : []),
       ],
     })
     const near = await db.select({ slug: s.events.slug, order: s.events.orderIndex }).from(s.events).orderBy(asc(s.events.orderIndex))
     return {
       ok: true, slug: a.slug, status: 'draft', revision_id: revisionId,
       position: `last of ${near.length} events`,
-      next_steps: ['set_event_order (if not last)', 'create_source + add_source_citation (required to publish)', 'find_place / attach ayat / add_recall_questions', 'preview_event'],
+      next_steps: ['set_event_order (if not last)', 'create_source + add_source_citation (required to publish)', 'set_primary_place (exactly one primary place is required to publish; add_event_place for related places)', 'attach ayat / add_recall_questions', 'preview_event'],
     }
   })
 
@@ -77,7 +78,7 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
       if (patch.hijri_year !== undefined) set.hijriYear = patch.hijri_year
       if (patch.gregorian_approx !== undefined) set.gregorianApprox = patch.gregorian_approx
       if (patch.prophet_age !== undefined) set.prophetAge = patch.prophet_age
-      if (patch.place_slug !== undefined) set.placeId = patch.place_slug ? (await placeBySlug(db, patch.place_slug)).id : null
+      // place_slug is a shorthand for set_primary_place (null clears the primary). Applied through event_places below.
       if (patch.route_slug !== undefined) set.routeId = patch.route_slug ? (await routeBySlug(db, patch.route_slug)).id : null
     }
     let tSet: Partial<typeof s.eventTranslations.$inferInsert> | null = null
@@ -93,14 +94,37 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
       if (ev.certainty === 'disputed' && dispute_note === null && !(await db.select().from(s.eventTranslations).where(and(eq(s.eventTranslations.eventId, ev.id), sql`${s.eventTranslations.lang} != ${translation.lang} and ${s.eventTranslations.disputeNote} is not null`))).length)
         throw new ToolError('This event is "disputed"; it needs a dispute_note. Use set_certainty to mark it agreed first.')
     }
+    // Places: patch.place_slug sets (or, with null, clears) the primary place through event_places.
+    let placeStmts: ReturnType<typeof placeLinkStatements> = []
+    let warnings: string[] | undefined
+    const agg = (patch?.place_slug !== undefined || tSet?.keyDetails !== undefined) ? (await loadEventAggregate(db, ev.id))! : null
+    if (patch?.place_slug !== undefined && agg) {
+      const links = linksOf(agg)
+      const primary = links.find((l) => l.role === 'primary')
+      const next = patch.place_slug === null
+        ? (primary ? planRemovePlace(links, primary.placeId, ev.status) : links)
+        : planSetPrimary(links, (await placeBySlug(db, patch.place_slug)).id)
+      placeStmts = placeLinkStatements(db, ev.id, next)
+    }
+    // Shrinking the default-language key_details can strand a picture placed "after detail N".
+    if (tSet?.keyDetails !== undefined && agg && translation!.lang === DEFAULT_LANG) {
+      const n = tSet.keyDetails.length
+      const stranded = agg.media.filter((m) => m.media.placement === 'in_key_details' && (m.media.afterKeyDetailIndex ?? 0) >= n)
+      if (stranded.length) {
+        const msg = `${stranded.length} picture(s) are placed after key detail ${stranded.map((m) => m.media.afterKeyDetailIndex).join(', ')} which would no longer exist with ${n} key details. Move them first with set_media_placement.`
+        if (ev.status === 'published') throw new ToolError(msg)
+        warnings = [msg]
+      }
+    }
     const { revisionId } = await withRevision(db, actor, {
       entity: 'event', entityId: ev.id, action: 'update',
       build: () => [
         db.update(s.events).set({ ...set, updatedAt: nowIso() }).where(eq(s.events.id, ev.id)),
+        ...placeStmts,
         ...(tSet ? [db.update(s.eventTranslations).set(tSet).where(and(eq(s.eventTranslations.eventId, ev.id), eq(s.eventTranslations.lang, translation!.lang)))] : []),
       ],
     })
-    return { ok: true, slug, revision_id: revisionId, live: ev.status === 'published' ? 'WARNING: this event is published, so the change is already live. revert_revision undoes it.' : undefined }
+    return { ok: true, slug, revision_id: revisionId, warnings, live: ev.status === 'published' ? 'WARNING: this event is published, so the change is already live. revert_revision undoes it.' : undefined }
   })
 
   defineTool(server, ctx, 'set_event_order', {
@@ -193,7 +217,7 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
 
   defineTool(server, ctx, 'publish_event', {
     title: 'Publish event',
-    description: 'Make an event (and its default-language translation) public. Blocked until it has a source citation, a certainty flag and a title+summary. Seed/sample events additionally require confirm_verified: true after the owner has checked the content.',
+    description: 'Make an event (and its default-language translation) public. Blocked until it has a source citation, a certainty flag, a title+summary, exactly one primary place, and valid picture placements. Seed/sample events additionally require confirm_verified: true after the owner has checked the content.',
     access: 'owner',
     input: z.object({
       slug: SlugSchema,
@@ -204,10 +228,7 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
     const ev = await eventBySlug(db, slug)
     if (ev.status === 'published') throw new ToolError(`"${slug}" is already published.`)
     const agg = (await loadEventAggregate(db, ev.id))!
-    const blockers = publishBlockers({
-      certainty: ev.certainty, sourceCount: agg.sources.length,
-      translations: agg.translations.map((t) => ({ lang: t.lang, title: t.title, summary: t.summary, dispute_note: t.disputeNote })),
-    })
+    const blockers = blockersFor(agg)
     if (ev.needsVerification && !confirm_verified)
       blockers.push('This event is seed/sample content flagged "needs owner verification". After checking it, call publish_event again with confirm_verified: true.')
     for (const l of publish_langs ?? []) if (!agg.translations.some((t) => t.lang === l)) blockers.push(`No "${l}" translation to publish.`)

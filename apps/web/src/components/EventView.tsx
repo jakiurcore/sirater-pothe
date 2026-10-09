@@ -1,15 +1,41 @@
 import Link from 'next/link'
 import { makeFmt, getMessages, hijriLabel, gregLabel, ageLabel, type Lang } from '@/lib/i18n'
-import type { EventPage } from '@/lib/content'
+import type { EventPage, MediaItem } from '@/lib/content'
 import { Icon } from './icons'
 import { MapSync } from './MapStage'
 import { EventEnter, NoteField, ReadButton } from './EventBits'
+
+/** One picture: lazy, with reserved space (no layout shift), alt text, optional caption and credit. */
+function Pic({ m }: { m: MediaItem }) {
+  return (
+    <figure className="pic" data-placement={m.placement}>
+      <div className="frame" style={m.width && m.height ? { aspectRatio: `${m.width} / ${m.height}` } : undefined}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={m.src} alt={m.alt} width={m.width ?? undefined} height={m.height ?? undefined} loading="lazy" decoding="async" />
+      </div>
+      {m.caption || m.credit ? (
+        <figcaption>
+          {m.caption ? <span>{m.caption}</span> : null}
+          {m.credit ? <small>{m.credit}</small> : null}
+        </figcaption>
+      ) : null}
+    </figure>
+  )
+}
+const Pics = ({ items, className = '' }: { items: MediaItem[]; className?: string }) =>
+  items.length ? <div className={`pics ${className}`.trim()}>{items.map((m) => <Pic key={m.id} m={m} />)}</div> : null
 
 export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang; preview?: { expiresAt: string } }) {
   const f = makeFmt(lang, getMessages(lang))
   const c = page.card
   const idx = f.t('event.idx', { i: page.index, total: page.total })
-  const hasBody = page.keyDetails.length > 0 || page.lessons.length > 0 || page.sources.length > 0
+  const hasBody = page.keyDetails.length > 0 || page.lessons.length > 0 || page.sources.length > 0 || page.media.length > 0
+  // Pictures sit exactly where their structured placement says (the same in preview and when published).
+  const at = (p: MediaItem['placement']) => page.media.filter((m) => m.placement === p)
+  const nKeys = page.keyDetails.length
+  // A key-detail index that no longer exists (details were edited) clamps to the last one; with no details at all the picture goes before the lessons.
+  const inKeys = (i: number) => at('in_key_details').filter((m) => nKeys > 0 && Math.min(m.afterKeyDetailIndex ?? 0, nKeys - 1) === i)
+  const beforeLessons = [...(nKeys === 0 ? at('in_key_details') : []), ...at('before_lessons')]
   return (
     <div className="contents">
       <MapSync data={page.map} />
@@ -35,7 +61,7 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
             <div><dt>{f.t('event.hijri')}</dt><dd>{hijriLabel(f, c.hijriYear)}</dd></div>
             <div><dt>{f.t('event.greg')}</dt><dd>{gregLabel(f, c.gregorianApprox)}</dd></div>
             <div><dt>{f.t('event.age')}</dt><dd>{ageLabel(f, c.prophetAge, c.hijriYear)}</dd></div>
-            <div><dt>{f.t('event.place')}</dt><dd>{c.place ?? '—'}</dd></div>
+            <div><dt>{f.t('event.place')}</dt><dd>{page.placeLabel ?? '—'}</dd></div>
           </dl>
           {page.certainty === 'agreed' ? (
             <span className="agreed"><Icon d="check" size={14} sw={2.6} />{f.t('event.agreed')}</span>
@@ -49,6 +75,8 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
             </div>
           )}
         </header>
+
+        <Pics items={at('hero')} className="top" />
 
         {page.ayat.map((a) => (
           <figure key={a.ref} className="verse">
@@ -67,12 +95,21 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
           <p className="sum">{page.summary}</p>
         </section>
 
+        <Pics items={at('after_summary')} />
+
         {page.keyDetails.length ? (
           <section className="sec">
             <h2>{f.t('event.key')}</h2>
-            <ol className="keys">{page.keyDetails.map((k, i) => <li key={i}><b>{f.n(i + 1)}</b><span>{k}</span></li>)}</ol>
+            <ol className="keys">
+              {page.keyDetails.flatMap((k, i) => [
+                <li key={`k${i}`}><b>{f.n(i + 1)}</b><span>{k}</span></li>,
+                ...inKeys(i).map((m) => <li key={m.id} className="keypic"><Pic m={m} /></li>),
+              ])}
+            </ol>
           </section>
         ) : null}
+
+        <Pics items={beforeLessons} />
 
         {page.lessons.length ? (
           <section className="sec">
@@ -106,6 +143,13 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
                 </li>
               ))}
             </ul>
+          </section>
+        ) : null}
+
+        {at('gallery').length ? (
+          <section className="sec">
+            <h2>{f.t('event.gallery')}</h2>
+            <Pics items={at('gallery')} className="grid" />
           </section>
         ) : null}
 

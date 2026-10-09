@@ -44,6 +44,8 @@ const PAGES = {
   'event-lang-menu': { path: '/bn/events/hijrah-to-madinah', after: async (p) => { await p.locator('.lang button:visible').first().click().catch(() => {}); await p.waitForTimeout(300) } },
   'event-ar': { path: '/ar/events/hijrah-to-madinah' },
   notfound: { path: '/bn/events/does-not-exist' },
+  'event-media': { path: '/bn/events/battle-of-badr', after: async (p) => { for (const f of await p.locator('figure.pic').all()) { await f.scrollIntoViewIfNeeded(); await p.waitForTimeout(150) } await p.evaluate(() => scrollTo(0, 0)) } },
+  'event-media-preview': { path: '/bn/preview/e2e-media?token=e2e-media-draft-preview-token-0123456789', after: async (p) => { for (const f of await p.locator('figure.pic').all()) { await f.scrollIntoViewIfNeeded(); await p.waitForTimeout(150) } await p.evaluate(() => scrollTo(0, 0)) } },
 }
 
 /** In-page layout checks. */
@@ -73,6 +75,7 @@ async function live() {
   for (const w of WIDTHS) {
     const ctx = await b.newContext({ viewport: { width: w, height: w >= 900 ? 860 : 844 }, reducedMotion: 'reduce' })
     for (const [id, cfg] of Object.entries(PAGES)) {
+      if (process.env.ONLY && !new RegExp(process.env.ONLY).test(id)) continue
       const page = await ctx.newPage()
       const state = 'state' in cfg ? cfg.state : STATE
       await page.addInitScript(([st, theme]) => {

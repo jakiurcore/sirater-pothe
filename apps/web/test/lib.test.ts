@@ -42,15 +42,23 @@ describe('map helpers', () => {
     expect(s.some((p) => Math.hypot(p[0] - pts[1]![0], p[1] - pts[1]![1]) < 0.02)).toBe(true)
     expect(smooth([pts[0]!, pts[1]!])).toEqual([pts[0], pts[1]])
   })
-  const base: MapData = { eventId: 'e', markers: [], route: null, label: '' }
+  const base: MapData = { eventId: 'e', markers: [], route: null, label: '', focus: null, maxZoom: null }
   it('boundsFor: peninsula when empty, never tighter than ~0.7° for one place, covers route + markers', () => {
     expect(boundsFor(base)).toEqual(PENINSULA)
-    const [[w, s], [e, n]] = boundsFor({ ...base, markers: [{ slug: 'hira', name: 'h', lng: 39.86, lat: 21.46, highlight: true }] })
+    const [[w, s], [e, n]] = boundsFor({ ...base, markers: [{ slug: 'hira', name: 'h', lng: 39.86, lat: 21.46, highlight: true, role: 'primary' }] })
     expect(e - w).toBeGreaterThanOrEqual(0.7)
     expect(n - s).toBeGreaterThanOrEqual(0.7)
-    const b = boundsFor({ ...base, markers: [{ slug: 'a', name: 'a', lng: 39.8, lat: 21.4, highlight: false }], route: { slug: 'r', name: 'r', coordinates: [[39.8, 21.4], [39.6, 24.5]] } })
+    const b = boundsFor({ ...base, markers: [{ slug: 'a', name: 'a', lng: 39.8, lat: 21.4, highlight: false, role: 'related' }], route: { slug: 'r', name: 'r', coordinates: [[39.8, 21.4], [39.6, 24.5]] } })
     expect(b[0][0]).toBeLessThanOrEqual(39.6)
     expect(b[1][1]).toBeGreaterThanOrEqual(24.5)
+  })
+  it('boundsFor: with a primary place (maxZoom set) nearby sites are not padded out, the zoom cap does the limiting', () => {
+    const [[w, s], [e, n]] = boundsFor({ ...base, maxZoom: 17, markers: [
+      { slug: 'zamzam', name: 'z', lng: 39.826, lat: 21.422, highlight: true, role: 'primary' },
+      { slug: 'haram', name: 'h', lng: 39.8262, lat: 21.4225, highlight: false, role: 'related' },
+    ] })
+    expect(e - w).toBeLessThan(0.01)
+    expect(n - s).toBeLessThan(0.01)
   })
 })
 

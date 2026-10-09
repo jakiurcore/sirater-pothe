@@ -3,6 +3,8 @@ import { and, asc, eq, inArray } from 'drizzle-orm'
 import { schema as s, type Db } from '@seerah/db'
 import { addHonorific } from '@seerah/content/honorific'
 import { DEFAULT_LANG, type Lang } from '@seerah/content/langs'
+import { effectiveZoom, type EventPlaceRole, type PlaceType } from '@seerah/content/geo'
+import type { MediaPlacement } from '@seerah/content/placement'
 import { getDatabase } from './env'
 
 /** "Always render ﷺ after the Prophet's name": enforced again at render time, whatever is stored. */
@@ -35,12 +37,28 @@ export interface Timeline {
   /** Flat, in reading order. */
   events: EventCard[]
 }
-export interface MapMarker { slug: string; name: string; lng: number; lat: number; highlight: boolean }
+export interface MapMarker { slug: string; name: string; lng: number; lat: number; highlight: boolean; role: EventPlaceRole | 'route' }
+export interface MediaItem {
+  id: string
+  src: string
+  placement: MediaPlacement
+  /** 0-based key detail the picture follows (placement in_key_details). */
+  afterKeyDetailIndex: number | null
+  alt: string
+  caption: string | null
+  credit: string | null
+  width: number | null
+  height: number | null
+}
 export interface MapData {
   eventId: string
   markers: MapMarker[]
   route: { slug: string; name: string; coordinates: [number, number][] } | null
   label: string
+  /** One place and nothing else to show: the camera flies straight to it at this zoom. */
+  focus: { lng: number; lat: number; zoom: number } | null
+  /** With several places or a route the camera fits them all, but never closer than this (the primary place's zoom). */
+  maxZoom: number | null
 }
 export interface AyahView { ref: string; surah: number; ayah: number; arabic: string; translation: string | null; translationSource: string | null; translationLicense: string | null }
 export interface EventPage {
@@ -57,6 +75,9 @@ export interface EventPage {
   hadith: { collection: string; number: string; grading: string; gradingBy: string | null; note: string | null }[]
   sources: { book: string; author: string; edition: string | null; volume: string | null; page: string; note: string | null }[]
   map: MapData
+  /** Primary first, then related / route places; what the "place" fact shows. */
+  placeLabel: string | null
+  media: MediaItem[]
   /** Language the text is actually in (differs from the requested one when falling back). */
   textLang: string
   /** Languages with a published translation of this event (for hreflang). */
@@ -80,14 +101,17 @@ export const getTimeline = cache(async (lang: Lang): Promise<Timeline> => {
 })
 
 export async function loadTimeline(db: Db, lang: Lang): Promise<Timeline> {
-  const [eraRows, eraTr, evRows, placeIds] = await Promise.all([
+  const [eraRows, eraTr, evRows, primaries] = await Promise.all([
     db.select().from(s.eras).orderBy(asc(s.eras.orderIndex)),
     db.select().from(s.eraTranslations),
     db.select().from(s.events).where(eq(s.events.status, 'published')).orderBy(asc(s.events.orderIndex)),
-    db.select({ id: s.events.placeId }).from(s.events).where(eq(s.events.status, 'published')),
+    db.select({ eventId: s.eventPlaces.eventId, placeId: s.eventPlaces.placeId }).from(s.eventPlaces).innerJoin(s.events, eq(s.events.id, s.eventPlaces.eventId)).where(and(eq(s.events.status, 'published'), eq(s.eventPlaces.role, 'primary'))),
   ])
   const ids = evRows.map((e) => e.id)
-  const pids = [...new Set(placeIds.map((p) => p.id).filter((x): x is string => !!x))]
+  // The primary place of each event; events.place_id is only a fallback for rows written before event_places existed.
+  const primaryOf = new Map(primaries.map((p) => [p.eventId, p.placeId]))
+  for (const e of evRows) if (!primaryOf.has(e.id) && e.placeId) primaryOf.set(e.id, e.placeId)
+  const pids = [...new Set(primaryOf.values())]
   const [tr, pn] = await Promise.all([
     ids.length ? db.select().from(s.eventTranslations).where(inArray(s.eventTranslations.eventId, ids)) : [],
     pids.length ? db.select().from(s.placeTranslations).where(inArray(s.placeTranslations.placeId, pids)) : [],
@@ -99,7 +123,8 @@ export async function loadTimeline(db: Db, lang: Lang): Promise<Timeline> {
   for (const e of evRows) {
     const t = pick(trBy.get(e.id) ?? [], lang, false)
     if (!t) continue // no published translation in any usable language → not listed
-    events.push(card(e, t, e.placeId ? pick(pnBy.get(e.placeId) ?? [], lang, true)?.name ?? null : null))
+    const pid = primaryOf.get(e.id)
+    events.push(card(e, t, pid ? pick(pnBy.get(pid) ?? [], lang, true)?.name ?? null : null))
   }
   const eras: EraGroup[] = eraRows.map((er, i) => {
     const t = pick(eraTr.filter((x) => x.eraId === er.id), lang, true)
@@ -116,34 +141,49 @@ function card(e: typeof s.events.$inferSelect, t: TRow, place: string | null): E
 }
 
 // ───────── single event ─────────
-export interface EventLookup { slug: string; lang: Lang; /** Allow drafts. Only after a preview token has been verified. */ preview?: boolean }
+export interface EventLookup { slug: string; lang: Lang; /** Allow drafts. Only after a preview token has been verified. */ preview?: boolean; /** The verified preview token: picture URLs carry it so drafts' images can load. */ previewToken?: string }
 
-export async function getEventPage({ slug, lang, preview = false }: EventLookup): Promise<EventPage | null> {
+export async function getEventPage({ slug, lang, preview = false, previewToken }: EventLookup): Promise<EventPage | null> {
   const db = await getDatabase()
   const e = await db.query.events.findFirst({ where: eq(s.events.slug, slug) })
   if (!e) return null
   if (!preview && e.status !== 'published') return null
 
-  const [trAll, eraRow, eraTr, timeline, placeRow, routeRow] = await Promise.all([
+  const [trAll, eraRow, eraTr, timeline, links, routeRow, mediaRows] = await Promise.all([
     db.select().from(s.eventTranslations).where(eq(s.eventTranslations.eventId, e.id)),
     db.query.eras.findFirst({ where: eq(s.eras.id, e.eraId) }),
     db.select().from(s.eraTranslations).where(eq(s.eraTranslations.eraId, e.eraId)),
     getTimeline(lang),
-    e.placeId ? db.query.places.findFirst({ where: eq(s.places.id, e.placeId) }) : undefined,
+    db.select().from(s.eventPlaces).where(eq(s.eventPlaces.eventId, e.id)).orderBy(asc(s.eventPlaces.orderIndex)),
     e.routeId ? db.query.routes.findFirst({ where: eq(s.routes.id, e.routeId) }) : undefined,
+    db.select().from(s.media).where(eq(s.media.eventId, e.id)).orderBy(asc(s.media.orderIndex), asc(s.media.createdAt), asc(s.media.id)),
   ])
   const t = pick(trAll, lang, preview)
   if (!t) return null
+  // Backward compatible read: a row written before event_places existed has only events.place_id.
+  if (!links.some((l) => l.role === 'primary') && e.placeId) links.unshift({ eventId: e.id, placeId: e.placeId, role: 'primary', orderIndex: 0 })
+  const linkedIds = links.map((l) => l.placeId)
 
-  const [placeNames, routeNames, cites, ayahLinks, hadithLinks, allPlaces] = await Promise.all([
-    placeRow ? db.select().from(s.placeTranslations).where(eq(s.placeTranslations.placeId, placeRow.id)) : [],
+  const [linkedPlaces, linkedNames, mediaAlts, routeNames, cites, ayahLinks, hadithLinks, allPlaces] = await Promise.all([
+    linkedIds.length ? db.select().from(s.places).where(inArray(s.places.id, linkedIds)) : [],
+    linkedIds.length ? db.select().from(s.placeTranslations).where(inArray(s.placeTranslations.placeId, linkedIds)) : [],
+    mediaRows.length ? db.select().from(s.mediaAlt).where(inArray(s.mediaAlt.mediaId, mediaRows.map((m) => m.id))) : [],
     routeRow ? db.select().from(s.routeTranslations).where(eq(s.routeTranslations.routeId, routeRow.id)) : [],
     db.select().from(s.eventSources).where(eq(s.eventSources.eventId, e.id)),
     db.select().from(s.eventAyat).where(eq(s.eventAyat.eventId, e.id)).orderBy(asc(s.eventAyat.orderIndex)),
     db.select().from(s.eventHadith).where(eq(s.eventHadith.eventId, e.id)),
     routeRow ? db.select().from(s.places) : [],
   ])
-  const placeName = placeRow ? pick(placeNames, lang, true)?.name ?? placeRow.slug : null
+  const evPlaces = links.map((l) => {
+    const p = linkedPlaces.find((x) => x.id === l.placeId)
+    return p ? { link: l, place: p, name: pick(linkedNames.filter((n) => n.placeId === p.id), lang, true)?.name ?? p.slug } : null
+  }).filter((x): x is NonNullable<typeof x> => !!x)
+  const primary = evPlaces.find((x) => x.link.role === 'primary') ?? null
+  const placeName = primary?.name ?? null
+  const byRole = (r: EventPlaceRole) => evPlaces.find((x) => x.link.role === r)
+  const placeLabel = byRole('route_start') && byRole('route_end')
+    ? `${byRole('route_start')!.name} → ${byRole('route_end')!.name}`
+    : evPlaces.length ? evPlaces.map((x) => x.name).join(' · ') : null
 
   const srcIds = [...new Set(cites.map((c) => c.sourceId))]
   const ayahIds = ayahLinks.map((a) => a.ayahId)
@@ -157,17 +197,28 @@ export async function getEventPage({ slug, lang, preview = false }: EventLookup)
   ])
   const datasetName = new Map(datasets.map((d) => [d.id, d.name]))
 
-  // Map: the event's place (highlighted), plus any gazetteer place that sits on the route (e.g. Thawr on the Hijrah path).
-  const markers: MapMarker[] = []
+  // Map: the primary place (highlighted), related / route places as secondary markers, plus any gazetteer place on the route.
+  const markers: MapMarker[] = evPlaces.map((x) => ({ slug: x.place.slug, name: x.name, lng: x.place.lng, lat: x.place.lat, highlight: x.link.role === 'primary', role: x.link.role }))
   let route: MapData['route'] = null
   if (routeRow) {
     const coords = routeRow.geojson.coordinates
     route = { slug: routeRow.slug, name: pick(routeNames, lang, true)?.name ?? routeRow.slug, coordinates: coords }
-    const near = allPlaces.filter((p) => coords.some(([lng, lat]) => Math.abs(lng - p.lng) < 0.03 && Math.abs(lat - p.lat) < 0.03))
+    const near = allPlaces.filter((p) => coords.some(([lng, lat]) => Math.abs(lng - p.lng) < 0.03 && Math.abs(lat - p.lat) < 0.03) && !markers.some((m) => m.slug === p.slug))
     const names = near.length ? await db.select().from(s.placeTranslations).where(inArray(s.placeTranslations.placeId, near.map((p) => p.id))) : []
-    for (const p of near) markers.push({ slug: p.slug, name: pick(names.filter((n) => n.placeId === p.id), lang, true)?.name ?? p.slug, lng: p.lng, lat: p.lat, highlight: p.id === placeRow?.id })
+    for (const p of near) markers.push({ slug: p.slug, name: pick(names.filter((n) => n.placeId === p.id), lang, true)?.name ?? p.slug, lng: p.lng, lat: p.lat, highlight: false, role: 'route' })
   }
-  if (placeRow && !markers.some((m) => m.slug === placeRow.slug)) markers.push({ slug: placeRow.slug, name: placeName ?? placeRow.slug, lng: placeRow.lng, lat: placeRow.lat, highlight: true })
+  // Camera: one place and no route → fly to it at its type's zoom (capped where only coarse tiles exist); otherwise fit everything.
+  const zoom = primary ? effectiveZoom(primary.place.type as PlaceType, primary.place.zoomOverride, primary.place.lng, primary.place.lat) : null
+  const focus = primary && markers.length === 1 && !route ? { lng: primary.place.lng, lat: primary.place.lat, zoom: zoom! } : null
+
+  const media: MediaItem[] = mediaRows.map((m) => {
+    const alts = mediaAlts.filter((a) => a.mediaId === m.id)
+    const a = alts.find((x) => x.lang === lang) ?? alts.find((x) => x.lang === DEFAULT_LANG) ?? alts[0]
+    return {
+      id: m.id, src: `/media/${m.id}${previewToken ? `?token=${encodeURIComponent(previewToken)}` : ''}`, placement: m.placement, afterKeyDetailIndex: m.afterKeyDetailIndex,
+      alt: hon(a?.alt ?? ''), caption: honN(a?.caption), credit: m.credit, width: m.width, height: m.height,
+    }
+  })
 
   const eraT = pick(eraTr, lang, true)
   const eraIdx = timeline.eras.findIndex((x) => x.id === e.eraId)
@@ -209,7 +260,9 @@ export async function getEventPage({ slug, lang, preview = false }: EventLookup)
       const src = srcRows.find((x) => x.id === c.sourceId)
       return { book: src?.book ?? '', author: src?.author ?? '', edition: src?.edition ?? null, volume: c.volume, page: c.page, note: c.note }
     }),
-    map: { eventId: e.id, markers, route, label: markers.map((m) => m.name).join('، ') },
+    map: { eventId: e.id, markers, route, label: markers.map((m) => m.name).join('، '), focus, maxZoom: zoom },
+    placeLabel,
+    media,
     textLang: t.lang,
     translatedLangs: trAll.filter((x) => x.status === 'published').map((x) => x.lang),
     index: index + 1,

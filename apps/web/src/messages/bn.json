@@ -52,6 +52,7 @@
   "event.sources": "সূত্র",
   "event.ayat": "কুরআনের আয়াত",
   "event.hadith": "হাদীস",
+  "event.gallery": "ছবি",
   "ayah.ref": "কুরআন {s}:{a}",
   "event.stub": "এই ঘটনার মূল বিষয়, শিক্ষা ও সূত্রসহ বিস্তারিত পাঠ শিগগিরই যুক্ত হবে।",
   "event.verification": "এই ঘটনা এখনও যাচাই করা হয়নি।",

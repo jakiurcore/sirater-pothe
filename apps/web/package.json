@@ -14,7 +14,7 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "predev": "node scripts/copy-maplibre.mjs",
     "prebuild": "node scripts/copy-maplibre.mjs",
-    "db:local": "wrangler d1 migrations apply seerah --local && wrangler d1 execute seerah --local --file ../../packages/db/seed/seed.dev.sql && wrangler r2 object put seerah-tiles/arabia.pmtiles --file tiles/arabia.pmtiles --local",
+    "db:local": "wrangler d1 migrations apply seerah --local && wrangler d1 execute seerah --local --file ../../packages/db/seed/seed.dev.sql && wrangler r2 object put seerah-tiles/arabia.pmtiles --file tiles/arabia.pmtiles --local && wrangler r2 object put seerah-tiles/makkah.pmtiles --file tiles/makkah.pmtiles --local",
     "e2e": "playwright test",
     "e2e:setup": "node e2e/setup.mjs"
   },

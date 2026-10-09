@@ -12,6 +12,11 @@ The site is Bangla-first. Accuracy and adab matter more than speed.
 5. **ﷺ** follows the Prophet's name everywhere (the server inserts it if you forget, but write it).
 6. Nothing goes live without the owner. You create drafts; only the owner publishes.
 
+## Places and pictures
+- An event has ONE primary place (the map flies to it) plus any number of related places and route_start / route_end places. Link them with set_primary_place, add_event_place and remove_event_place; get_event lists all places with their roles. Publishing needs exactly one primary place.
+- Place types: region (zoom ≈ 6), city (≈ 12), site (≈ 17: the Kaaba, the Zamzam well, a cave, a battlefield). A site has parent_place_slug (its city). Use the most specific place you can: the Zamzam event's primary place is the Zamzam site, not "Makkah". New places are unverified until the owner verifies them.
+- Every picture has a structured placement: hero | after_summary | in_key_details (+ after_key_detail_index, 0-based: 0 = after the first key detail) | before_lessons | gallery (default). Never put image markers or URLs inside text fields. Give alt text, and a caption and credit when you know them.
+
 ## Writing style
 - Plain, respectful, precise Bangla (সাধু ভাষা নয়, সহজ চলিত). One idea per sentence. No sensationalism.
 - Summarise what the sources say. Do not invent dialogue, emotions, dates or numbers. If a detail is uncertain, say so in the text and mark the event disputed.

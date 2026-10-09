@@ -7,6 +7,7 @@
  */
 import type { Map as MLMap, Marker, LngLatBoundsLike, GeoJSONSource, StyleSpecification } from 'maplibre-gl'
 import type { Feature, FeatureCollection } from 'geojson'
+import { TILE_DETAIL_AREAS } from '@seerah/content/geo'
 import type { MapData } from './content'
 
 type LL = [number, number]
@@ -59,10 +60,13 @@ export function boundsFor(data: MapData): [LL, LL] {
   if (!pts.length) return PENINSULA
   let [w, s, e, n] = [Infinity, Infinity, -Infinity, -Infinity]
   for (const [x, y] of pts) { w = Math.min(w, x); e = Math.max(e, x); s = Math.min(s, y); n = Math.max(n, y) }
-  // Never zoom closer than ~0.7° across (about zoom 9.5): single places keep their surroundings.
-  const minSpan = 0.7
-  if (e - w < minSpan) { const c = (e + w) / 2; w = c - minSpan / 2; e = c + minSpan / 2 }
-  if (n - s < minSpan) { const c = (n + s) / 2; s = c - minSpan / 2; n = c + minSpan / 2 }
+  // Without a primary place (so no zoom to respect) never go closer than ~0.7° across (about zoom 9.5).
+  // With one, fitBounds is capped by that place's zoom instead, so a few nearby sites can fill the view.
+  if (data.maxZoom == null) {
+    const minSpan = 0.7
+    if (e - w < minSpan) { const c = (e + w) / 2; w = c - minSpan / 2; e = c + minSpan / 2 }
+    if (n - s < minSpan) { const c = (n + s) / 2; s = c - minSpan / 2; n = c + minSpan / 2 }
+  }
   return [[w, s], [e, n]]
 }
 
@@ -105,6 +109,11 @@ export class SeerahMap {
           url: `pmtiles://${this.opts.tilesUrl}`,
           attribution: '<a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
         },
+        ...Object.fromEntries(TILE_DETAIL_AREAS.map((a) => [`detail-${a.id}`, {
+          type: 'vector' as const,
+          url: `pmtiles://${this.opts.tilesUrl.replace(/[^/]+$/, a.file)}`,
+          bounds: [...a.bbox] as [number, number, number, number],
+        }])),
         grid: { type: 'geojson', data: graticule() },
         routeBase: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
         routeMain: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
@@ -114,6 +123,7 @@ export class SeerahMap {
         { id: 'earth', type: 'fill', source: 'protomaps', 'source-layer': 'earth', paint: { 'fill-color': this.css('--map-land') || '#F0E6D2' } },
         { id: 'lakes', type: 'fill', source: 'protomaps', 'source-layer': 'water', paint: { 'fill-color': this.css('--map-sea') || '#DDE3DA' } },
         { id: 'coast', type: 'line', source: 'protomaps', 'source-layer': 'earth', layout: { 'line-join': 'round' }, paint: { 'line-color': this.css('--map-coast') || '#B7A687', 'line-width': 1 } },
+        ...this.detailLayers(),
         { id: 'grid', type: 'line', source: 'grid', paint: { 'line-color': this.css('--map-grid') || 'rgba(46,106,97,.1)', 'line-width': 1 } },
         { id: 'route-base', type: 'line', source: 'routeBase', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': this.css('--map-route') || '#2E6A61', 'line-width': 7, 'line-opacity': 0, 'line-opacity-transition': { duration: 1000, delay: 0 } } },
         { id: 'route-main', type: 'line', source: 'routeMain', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': this.css('--map-route') || '#2E6A61', 'line-width': 2.5 } },
@@ -149,8 +159,33 @@ export class SeerahMap {
     this.mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
     this.ro = new ResizeObserver(() => { this.map.resize(); this.placeLabels() })
     this.ro.observe(this.el)
-    this.map.on('moveend', () => this.placeLabels())
+    this.map.on('moveend', () => { this.placeLabels(); this.el.dataset.zoom = this.map.getZoom().toFixed(2) })
     if (this.pending !== undefined) this.show(this.pending)
+  }
+
+  /**
+   * Streets and buildings for the areas that have a detailed archive (see TILE_DETAIL_AREAS), drawn in the map's own
+   * palette (coast colour, thin lines) from zoom 12 so a site such as the Kaaba shows its surroundings, not an empty plane.
+   */
+  private detailLayers(): StyleSpecification['layers'] {
+    const coast = this.css('--map-coast') || '#B7A687'
+    const out: StyleSpecification['layers'] = []
+    for (const a of TILE_DETAIL_AREAS) {
+      const source = `detail-${a.id}`
+      const road = (id: string, kinds: string[], w: [number, number], minzoom: number) => ({
+        id: `${source}-${id}`, type: 'line' as const, source, 'source-layer': 'roads', minzoom,
+        filter: ['in', ['get', 'kind'], ['literal', kinds]] as never,
+        layout: { 'line-cap': 'round' as const, 'line-join': 'round' as const },
+        paint: { 'line-color': coast, 'line-opacity': 0.75, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 12, w[0], 18, w[1]] as never },
+      })
+      out.push(
+        { id: `${source}-buildings`, type: 'fill', source, 'source-layer': 'buildings', minzoom: 14, paint: { 'fill-color': coast, 'fill-opacity': 0.28, 'fill-outline-color': coast } },
+        road('minor', ['minor_road', 'other'], [0.4, 3], 14),
+        road('medium', ['medium_road'], [0.6, 5], 12),
+        road('major', ['major_road', 'highway'], [0.9, 8], 12),
+      )
+    }
+    return out
   }
 
   private padding() {
@@ -168,6 +203,12 @@ export class SeerahMap {
     set('earth', 'fill-color', this.css('--map-land'))
     set('lakes', 'fill-color', this.css('--map-sea'))
     set('coast', 'line-color', this.css('--map-coast'))
+    for (const a of TILE_DETAIL_AREAS) {
+      const src = `detail-${a.id}`
+      const c = this.css('--map-coast')
+      set(`${src}-buildings`, 'fill-color', c); set(`${src}-buildings`, 'fill-outline-color', c)
+      for (const r of ['minor', 'medium', 'major']) set(`${src}-${r}`, 'line-color', c)
+    }
     set('grid', 'line-color', this.css('--map-grid'))
     set('route-base', 'line-color', this.css('--map-route'))
     set('route-main', 'line-color', this.css('--map-route'))
@@ -190,7 +231,8 @@ export class SeerahMap {
     const order = [...data.markers.filter((m) => !m.highlight), ...data.markers.filter((m) => m.highlight)]
     this.markers = order.map((m) => {
       const root = document.createElement('div')
-      root.className = `mapmk${m.highlight ? ' hl' : ''}`
+      root.className = `mapmk${m.highlight ? ' hl' : ''}${m.highlight ? '' : m.role === 'related' ? ' rel' : ''}`
+      root.dataset.role = m.role
       const dot = document.createElement('i')
       const label = document.createElement('span')
       label.className = `maplbl${m.highlight ? ' hl' : ''}`
@@ -206,7 +248,15 @@ export class SeerahMap {
     const draw = () => { clearTimeout(this.timer); this.placeLabels(); this.drawRoute(data, animate) }
     this.map.once('moveend', draw)
     this.timer = setTimeout(draw, duration + 400) // moveend can be skipped when the camera does not move
-    this.map.fitBounds(boundsFor(data) as LngLatBoundsLike, { padding: this.padding(), duration, maxZoom: MAX_ZOOM, easing: ease })
+    if (data.focus) {
+      // One place: fly to it at its type's zoom (region 6, city 12, site 17; capped where tiles are coarse).
+      const f = data.focus
+      if (animate) this.map.flyTo({ center: [f.lng, f.lat], zoom: f.zoom, padding: this.padding(), duration, essential: false, easing: ease })
+      else this.map.jumpTo({ center: [f.lng, f.lat], zoom: f.zoom, padding: this.padding() })
+    } else {
+      // Several places and/or a route: fit them all, never closer than the primary place's zoom.
+      this.map.fitBounds(boundsFor(data) as LngLatBoundsLike, { padding: this.padding(), duration, maxZoom: data.maxZoom ?? MAX_ZOOM, easing: ease })
+    }
     this.first = false
     this.placeLabels()
   }

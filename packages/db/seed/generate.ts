@@ -37,7 +37,7 @@ ERAS.forEach((e, i) => {
 // ── places (gazetteer; all verified = 0) ──
 for (const p of GAZETTEER_SEED) {
   const id = `seed-place-${p.slug}`
-  ins('places', { id, slug: p.slug, type: p.type, lat: p.lat, lng: p.lng, verified: false })
+  ins('places', { id, slug: p.slug, type: p.type, lat: p.lat, lng: p.lng, verified: false, parent_place_id: p.parent ? `seed-place-${p.parent}` : null, zoom_override: p.zoom ?? null })
   for (const [lang, name] of Object.entries(p.names)) ins('place_translations', { place_id: id, lang, name })
 }
 
@@ -142,6 +142,7 @@ EVENTS.forEach((e, i) => {
     place_id: `seed-place-${e.place}`, route_id: e.route ? `seed-route-${e.route}` : null, certainty: e.certainty, status,
     needs_verification: !dev, published_at: dev ? new Date().toISOString() : null,
   })
+  ins('event_places', { event_id: id, place_id: `seed-place-${e.place}`, role: 'primary', order_index: 0 })
   ins('event_translations', {
     event_id: id, lang: 'bn', title: e.title, summary: e.summary, key_details: JSON.stringify(e.key ?? []), lessons: JSON.stringify(e.lessons ?? []),
     dispute_note: e.dispute ?? null, status: dev ? 'published' : 'draft',

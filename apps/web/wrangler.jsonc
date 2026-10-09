@@ -20,5 +20,10 @@
     }
   ],
   // Map tiles (Protomaps PMTiles for the Arabian Peninsula), served by /tiles/arabia.pmtiles with Range support.
-  "r2_buckets": [{ "binding": "TILES", "bucket_name": "seerah-tiles" }]
+  // MEDIA: pictures uploaded through the MCP server (map / landscape / architecture / object / pattern / calligraphy only).
+  // Read-only here; /media/[id] serves a picture only for a published event, or with a valid preview token for a draft.
+  "r2_buckets": [
+    { "binding": "TILES", "bucket_name": "seerah-tiles" },
+    { "binding": "MEDIA", "bucket_name": "seerah-media" }
+  ]
 }

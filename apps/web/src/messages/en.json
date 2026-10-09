@@ -53,6 +53,7 @@
   "event.sources": "Sources",
   "event.ayat": "Qur'an",
   "event.hadith": "Hadith",
+  "event.gallery": "Pictures",
   "ayah.ref": "Qur'an {s}:{a}",
   "event.stub": "The key points, lessons and sources for this event will be added soon.",
   "event.verification": "This event has not been verified yet.",

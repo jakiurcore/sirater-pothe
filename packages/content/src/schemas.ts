@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { checkRef } from './quran'
 import { addHonorific } from './honorific'
-import { inArabiaBBox, ARABIA_BBOX } from './geo'
+import { inArabiaBBox, ARABIA_BBOX, PLACE_TYPES, EVENT_PLACE_ROLES, MIN_ZOOM_OVERRIDE, MAX_ZOOM_OVERRIDE } from './geo'
 
 // ───────────── primitives ─────────────
 export { SUPPORTED_LANGS, DEFAULT_LANG, type Lang } from './langs'
@@ -106,7 +106,9 @@ export const CitationSchema = z.object({
 })
 
 // ───────────── places / routes ─────────────
-export const PlaceTypeSchema = z.enum(['city', 'mountain', 'cave', 'valley', 'plain', 'battlefield', 'region', 'site'])
+export const PlaceTypeSchema = z.enum(PLACE_TYPES, { error: () => `type must be one of: ${PLACE_TYPES.join(', ')} (region ≈ zoom 6, city ≈ zoom 12, site ≈ zoom 17; a site such as the Kaaba or Zamzam belongs to a city).` })
+export const PlaceRoleSchema = z.enum(EVENT_PLACE_ROLES)
+export const ZoomSchema = z.number().int().min(MIN_ZOOM_OVERRIDE).max(MAX_ZOOM_OVERRIDE)
 const lat = z.number().min(-90).max(90)
 const lng = z.number().min(-180).max(180)
 
@@ -116,6 +118,8 @@ export const CreatePlaceSchema = z.object({
   lat,
   lng,
   names: z.partialRecord(LangSchema, z.string().trim().min(1).max(120)).refine((n) => Object.keys(n).length > 0, 'provide at least one name'),
+  parent_place_slug: SlugSchema.optional().describe('Slug of the containing place: a site\'s city, or a city\'s region.'),
+  zoom: ZoomSchema.optional().describe('Optional map zoom for this place; defaults by type (region 6, city 12, site 17).'),
   allow_outside_arabia: z.boolean().default(false),
 }).superRefine((v, ctx) => {
   if (!v.allow_outside_arabia && !inArabiaBBox(v.lng, v.lat))
@@ -170,13 +174,29 @@ export const MediaKindSchema = z.enum(ALLOWED_MEDIA_KINDS, {
   error: () => `kind must be one of: ${ALLOWED_MEDIA_KINDS.join(', ')}. Images depicting people (the Prophet ﷺ, other prophets, companions, family, angels) are never allowed.`,
 })
 
+// Where a picture sits inside the event page. Structured only: never put markers inside text fields.
+import { MEDIA_PLACEMENTS, placementProblem, type MediaPlacement } from './placement'
+export { MEDIA_PLACEMENTS, placementProblem, type MediaPlacement }
+export const MediaPlacementSchema = z.enum(MEDIA_PLACEMENTS, { error: () => `placement must be one of: ${MEDIA_PLACEMENTS.join(', ')}.` })
+
+export const PlacementFields = {
+  placement: MediaPlacementSchema.default('gallery').describe('hero: under the title; after_summary; in_key_details: after one key detail (needs after_key_detail_index); before_lessons; gallery (default): grid at the end.'),
+  after_key_detail_index: z.number().int().min(0).max(14).optional().describe('Only for in_key_details. 0-based: 0 puts the picture after the FIRST key detail, 1 after the second, and so on. It must exist in the default-language key_details.'),
+  order: z.number().int().min(0).max(999).optional().describe('Order among pictures with the same placement (lowest first).'),
+}
+
 export const UploadMediaSchema = z.object({
   kind: MediaKindSchema,
   mime: z.enum(ALLOWED_MEDIA_MIME),
   alt: z.partialRecord(LangSchema, z.string().trim().min(3).max(300)).refine((a) => Object.keys(a).length > 0, 'alt text is required in at least one language'),
+  caption: z.partialRecord(LangSchema, z.string().trim().min(1).max(300)).optional().describe('Optional caption shown under the picture, per language.'),
+  credit: z.string().trim().min(1).max(200).optional().describe('Optional credit / licence line, e.g. "Photo: … (CC BY-SA 4.0)".'),
+  ...PlacementFields,
   contains_people_confirmation: z.literal(false, { error: 'contains_people_confirmation must be false: images with any people, faces or figures are rejected.' }),
   base64: z.string().min(1),
 }).superRefine((v, ctx) => {
+  const pp = placementProblem(v)
+  if (pp) ctx.addIssue({ code: 'custom', path: ['placement'], message: pp })
   const approxBytes = Math.floor((v.base64.length * 3) / 4)
   if (approxBytes > MAX_MEDIA_BYTES) ctx.addIssue({ code: 'custom', path: ['base64'], message: `image is ${approxBytes} bytes; the limit is ${MAX_MEDIA_BYTES}.` })
 })
@@ -194,7 +214,11 @@ export interface PublishCandidate {
   sourceCount: number
   translations: { lang: string; title?: string | null; summary?: string | null; dispute_note?: string | null }[]
   defaultLang?: string
-  hasPlaceOrNoPlaceNeeded?: boolean
+  /** Places linked to the event with role "primary". Exactly one is required. */
+  primaryPlaceCount: number
+  /** Number of key_details in the default-language translation, and the event's pictures, to validate placements. */
+  keyDetailCount?: number
+  media?: { id: string; placement: MediaPlacement; after_key_detail_index?: number | null }[]
 }
 
 /** Returns a list of problems that block publishing; empty means publishable. */
@@ -206,6 +230,12 @@ export function publishBlockers(c: PublishCandidate): string[] {
   const t = c.translations.find((x) => x.lang === lang)
   if (!t || !t.title || !t.summary) out.push(`A "${lang}" translation with title and summary is required before publishing.`)
   if (c.certainty === 'disputed' && !c.translations.some((x) => x.dispute_note)) out.push('Certainty is "disputed" but no dispute_note explains the positions.')
+  if (c.primaryPlaceCount === 0) out.push('No primary place. Use set_primary_place (or add_event_place with role "primary").')
+  else if (c.primaryPlaceCount > 1) out.push(`${c.primaryPlaceCount} primary places; exactly one is allowed. Use set_primary_place to choose.`)
+  for (const m of c.media ?? []) {
+    const pp = placementProblem(m, c.keyDetailCount ?? 0)
+    if (pp) out.push(`Picture ${m.id}: ${pp} Fix it with set_media_placement.`)
+  }
   return out
 }
 

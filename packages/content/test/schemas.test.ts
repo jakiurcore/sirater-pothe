@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   AyahRefSchema, HadithRefSchema, UploadMediaSchema, CreateRouteSchema, CreatePlaceSchema, CreateEventDraftSchema,
-  RecallQuestionSchema, CitationSchema, publishBlockers, addHonorific, missingHonorific, HijriYearSchema, GAZETTEER_SEED, inArabiaBBox,
+  RecallQuestionSchema, CitationSchema, publishBlockers, placementProblem, placeZoom, effectiveZoom, maxZoomAt, DEFAULT_ZOOM, PlaceTypeSchema, addHonorific, missingHonorific, HijriYearSchema, GAZETTEER_SEED, inArabiaBBox,
 } from '../src'
 
 const msgs = (r: { success: boolean; error?: { issues: { message: string }[] } }) => r.error?.issues.map((i) => i.message).join(' | ') ?? ''
@@ -132,10 +132,90 @@ describe('events', () => {
 })
 
 describe('publishBlockers', () => {
-  const ok = { certainty: 'agreed' as const, sourceCount: 1, translations: [{ lang: 'bn', title: 't', summary: 's' }] }
+  const ok = { certainty: 'agreed' as const, sourceCount: 1, translations: [{ lang: 'bn', title: 't', summary: 's' }], primaryPlaceCount: 1 }
   it('passes a complete event', () => expect(publishBlockers(ok)).toEqual([]))
   it('requires a source', () => expect(publishBlockers({ ...ok, sourceCount: 0 })[0]).toMatch(/source citation/))
   it('requires certainty', () => expect(publishBlockers({ ...ok, certainty: null })[0]).toMatch(/Certainty/))
   it('requires default-lang translation', () => expect(publishBlockers({ ...ok, translations: [] })[0]).toMatch(/"bn" translation/))
+  it('requires exactly one primary place', () => {
+    expect(publishBlockers({ ...ok, primaryPlaceCount: 0 })[0]).toMatch(/No primary place/)
+    expect(publishBlockers({ ...ok, primaryPlaceCount: 2 })[0]).toMatch(/2 primary places/)
+  })
+  it('blocks a picture whose key-detail index no longer exists', () => {
+    const media = [{ id: 'm1', placement: 'in_key_details' as const, after_key_detail_index: 3 }]
+    expect(publishBlockers({ ...ok, keyDetailCount: 2, media })[0]).toMatch(/does not exist.*valid indexes 0–1/)
+    expect(publishBlockers({ ...ok, keyDetailCount: 4, media })).toEqual([])
+  })
   it('disputed requires note', () => expect(publishBlockers({ ...ok, certainty: 'disputed' })[0]).toMatch(/dispute_note/))
+})
+
+describe('place types and zoom', () => {
+  it('only region, city and site exist', () => {
+    for (const t of ['region', 'city', 'site']) expect(PlaceTypeSchema.safeParse(t).success).toBe(true)
+    for (const t of ['mountain', 'cave', 'battlefield', 'village']) expect(PlaceTypeSchema.safeParse(t).success, t).toBe(false)
+  })
+  it('default zoom by type: region 6, city 12, site 17', () => {
+    expect(DEFAULT_ZOOM).toEqual({ region: 6, city: 12, site: 17 })
+    expect(placeZoom('region')).toBe(6)
+    expect(placeZoom('city', null)).toBe(12)
+    expect(placeZoom('site', undefined)).toBe(17)
+  })
+  it('an override wins over the type default', () => {
+    expect(placeZoom('site', 14)).toBe(14)
+    expect(placeZoom('city', 9)).toBe(9)
+  })
+  it('zoom is capped where only coarse tiles exist, and not inside the detailed Makkah area', () => {
+    expect(maxZoomAt(39.826, 21.4225)).toBe(17) // Kaaba: detail tiles (z15) + 2 over-zoom
+    expect(maxZoomAt(39.61, 24.47)).toBe(12) // Madinah: base tiles only (z10) + 2
+    expect(effectiveZoom('site', null, 39.826, 21.4225)).toBe(17)
+    expect(effectiveZoom('site', null, 38.775, 23.73)).toBe(12) // Badr: asked 17, tiles allow 12
+    expect(effectiveZoom('city', null, 39.61, 24.47)).toBe(12)
+    expect(effectiveZoom('region', null, 40.6, 21)).toBe(6)
+  })
+  it('create_place validates zoom range and accepts a parent slug', () => {
+    const base = { slug: 'zamzam', type: 'site', lat: 21.422, lng: 39.826, names: { en: 'Zamzam' } }
+    expect(CreatePlaceSchema.safeParse({ ...base, parent_place_slug: 'makkah', zoom: 17 }).success).toBe(true)
+    expect(CreatePlaceSchema.safeParse({ ...base, zoom: 25 }).success).toBe(false)
+    expect(CreatePlaceSchema.safeParse({ ...base, zoom: 1 }).success).toBe(false)
+    expect(CreatePlaceSchema.safeParse({ ...base, type: 'cave' }).success).toBe(false)
+  })
+  it('gazetteer: new types only, Makkah sites have a parent and are unverified', () => {
+    for (const p of GAZETTEER_SEED) {
+      expect(['region', 'city', 'site']).toContain(p.type)
+      expect(p.verified).toBe(false)
+      if (p.parent) expect(GAZETTEER_SEED.find((x) => x.slug === p.parent)?.type, p.slug).toBe('city')
+    }
+    for (const s of ['masjid-al-haram', 'zamzam']) {
+      const g = GAZETTEER_SEED.find((p) => p.slug === s)!
+      expect(g.type).toBe('site')
+      expect(g.parent).toBe('makkah')
+    }
+  })
+})
+
+describe('media placement', () => {
+  const up = { kind: 'landscape', mime: 'image/png', alt: { bn: 'পাহাড়ের দৃশ্য' }, contains_people_confirmation: false, base64: 'AAAA' }
+  it('defaults to gallery', () => {
+    const r = UploadMediaSchema.safeParse(up)
+    expect(r.success && r.data.placement).toBe('gallery')
+  })
+  it('in_key_details needs an index; other placements reject one', () => {
+    expect(msgs(UploadMediaSchema.safeParse({ ...up, placement: 'in_key_details' }))).toMatch(/needs after_key_detail_index/)
+    expect(UploadMediaSchema.safeParse({ ...up, placement: 'in_key_details', after_key_detail_index: 0 }).success).toBe(true)
+    expect(msgs(UploadMediaSchema.safeParse({ ...up, placement: 'hero', after_key_detail_index: 1 }))).toMatch(/only applies to placement "in_key_details"/)
+  })
+  it('unknown placements are rejected with the list of valid ones', () => {
+    expect(msgs(UploadMediaSchema.safeParse({ ...up, placement: 'footer' }))).toMatch(/hero, after_summary, in_key_details, before_lessons, gallery/)
+  })
+  it('index must exist in the key details', () => {
+    expect(placementProblem({ placement: 'in_key_details', after_key_detail_index: 2 }, 3)).toBeNull()
+    expect(placementProblem({ placement: 'in_key_details', after_key_detail_index: 3 }, 3)).toMatch(/valid indexes 0–2/)
+    expect(placementProblem({ placement: 'in_key_details', after_key_detail_index: 0 }, 0)).toMatch(/no key_details yet/)
+    expect(placementProblem({ placement: 'gallery' }, 0)).toBeNull()
+  })
+  it('the no-people rules are unchanged', () => {
+    expect(UploadMediaSchema.safeParse({ ...up, kind: 'portrait' }).success).toBe(false)
+    expect(UploadMediaSchema.safeParse({ ...up, contains_people_confirmation: true }).success).toBe(false)
+    expect(UploadMediaSchema.safeParse({ ...up, alt: {} }).success).toBe(false)
+  })
 })

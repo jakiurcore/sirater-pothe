@@ -15,6 +15,27 @@
       "when": 1791486755569,
       "tag": "0001_users",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791531494543,
+      "tag": "0002_event_places_media_placement",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791531545765,
+      "tag": "0003_places_sites_and_event_places_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791531546991,
+      "tag": "0004_zamzam_event_primary_place",
+      "breakpoints": true
     }
   ]
 }

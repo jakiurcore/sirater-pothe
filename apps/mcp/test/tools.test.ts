@@ -51,6 +51,11 @@ describe('event lifecycle', () => {
     expect(e.text).toMatch(/source citation/)
     expect((await call(owner, 'create_source', { slug: 'rahiq', book: 'আর-রাহীকুল মাখতূম', author: 'সাফিউর রহমান মোবারকপুরী' })).isError).toBe(false)
     expect((await call(owner, 'add_source_citation', { event_slug: 'first-revelation', source_slug: 'rahiq', volume: '1', page: '98' })).isError).toBe(false)
+    // exactly one primary place is required too
+    const noPlace = await call(owner, 'publish_event', { slug: 'first-revelation' })
+    expect(noPlace.text).toMatch(/No primary place/)
+    expect((await call(owner, 'create_place', { slug: 'makkah', type: 'city', lat: 21.4225, lng: 39.826, names: { bn: 'মক্কা' } })).isError).toBe(false)
+    expect((await call(owner, 'set_primary_place', { event_slug: 'first-revelation', place_slug: 'makkah' })).isError).toBe(false)
     await db().update(s.events).set({ needsVerification: true })
     expect((await call(owner, 'publish_event', { slug: 'first-revelation' })).text).toMatch(/confirm_verified/)
     const ok = await call(owner, 'publish_event', { slug: 'first-revelation', confirm_verified: true })
@@ -135,7 +140,7 @@ describe('places, routes, media', () => {
   })
   it('create_place enforces bbox; create_route enforces [lng,lat] and bbox', async () => {
     expect((await call(owner, 'create_place', { slug: 'london', type: 'city', lat: 51.5, lng: -0.1, names: { en: 'London' } })).isError).toBe(true)
-    expect((await call(owner, 'create_place', { slug: 'makkah', type: 'city', lat: 21.4225, lng: 39.826, names: { bn: 'মক্কা' } })).isError).toBe(false)
+    expect((await call(owner, 'create_place', { slug: 'makkah', type: 'city', lat: 21.4225, lng: 39.826, names: { bn: 'মক্কা' } })).text).toMatch(/already exists/) // created in the publish test above
     expect((await call(owner, 'create_route', { slug: 'r', names: { bn: 'পথ' }, geojson: { type: 'LineString', coordinates: [[21.4, 39.8], [24.4, 39.6]] } })).text).toMatch(/\[lng, lat\]/)
     expect((await call(owner, 'create_route', { slug: 'hijrah', names: { bn: 'হিজরত' }, geojson: { type: 'LineString', coordinates: [[39.826, 21.42], [39.61, 24.47]] } })).isError).toBe(false)
     expect((await call(owner, 'update_event', { slug: 'editor-draft', patch: { place_slug: 'makkah', route_slug: 'hijrah' } })).isError).toBe(false)

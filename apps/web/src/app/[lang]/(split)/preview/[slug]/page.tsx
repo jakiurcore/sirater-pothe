@@ -16,7 +16,7 @@ export default async function PreviewRoute({ params, searchParams }: P) {
   const token = Array.isArray(sp.token) ? sp.token[0] : sp.token
   const ok = await verifyPreviewToken(slug, token)
   // Drafts are only ever loaded after the token check; every failure looks the same.
-  const page = ok.ok ? await getEventPage({ slug, lang, preview: true }) : null
+  const page = ok.ok ? await getEventPage({ slug, lang, preview: true, previewToken: token }) : null
   if (!ok.ok || !page) {
     const f = makeFmt(lang, getMessages(lang))
     return <div className="ev"><p className="stub">{f.t('preview.invalid')}</p></div>

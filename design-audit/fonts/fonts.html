@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600&family=Anek+Bangla:wght@400;500;600&family=Baloo+Da+2:wght@400;500;600&family=Tiro+Bangla&family=Noto+Serif+Bengali:wght@400;600&display=swap">
+<style>
+body{margin:0;padding:16px;font-family:system-ui;width:1180px}
+.theme{display:inline-block;vertical-align:top;width:570px;padding:14px;margin:0 6px 12px 0;border-radius:12px}
+.light{background:#F3EBDD;color:#1E1A16;--ink2:#5B5047;--line:#DCCFB8;--hl:#2E6A61}
+.dark{background:#0D1524;color:#EEE5D1;--ink2:#B8AD98;--line:#27354F;--hl:#7FBFB2}
+h4{margin:0 0 6px;font:600 12px system-ui;opacity:.7}
+.f{padding:7px 0;border-top:1px solid var(--line)}
+.name{font:600 11px system-ui;opacity:.65;margin-bottom:3px}
+.row{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+.d{letter-spacing:.06em}
+.e{margin-top:3px;color:var(--hl);font-weight:600}
+</style>
+<body>
+<script>
+const FONTS=[['Hind Siliguri','current (baseline)'],['Noto Sans Bengali','Noto Sans Bengali'],['Anek Bangla','Anek Bangla'],['Baloo Da 2','Baloo Da 2'],['Tiro Bangla','Tiro Bangla']];
+for (const t of ['light','dark']) {
+  let h=`<div class="theme ${t}"><h4>${t}</h4>`;
+  for (const [fam,label] of FONTS) {
+    h+=`<div class="f" style="font-family:'${fam}'"><div class="name">${label}</div>`;
+    for (const w of [500,600]) h+=`<div class="row" style="font-weight:${w}">`+[12,13,14].map(s=>`<span class="d" style="font-size:${s}px">০১২৩৪৫৬৭৮৯</span>`).join('')+`<span style="font-size:11px;opacity:.5">${w}</span></div>`;
+    h+=`<div class="e" style="font-size:13px">পর্ব ১ · ইসলামপূর্ব আরব ও জন্মের আগে · ঘটনা ৬ / ৬</div><div style="font-size:12.5px;color:var(--ink2)">১ হি. · ৬২২ খ্রি. · ৫৩ বছর · ১৬ ঘটনা · ৯৯%</div></div>`;
+  }
+  document.body.insertAdjacentHTML('beforeend',h+'</div>');
+}
+</script>

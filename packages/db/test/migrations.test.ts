@@ -41,3 +41,99 @@ describe('migrations', () => {
     expect(() => db.exec("insert into ayat(id,surah,ayah,arabic_text,arabic_source) values('a2',96,1,'x','s')")).toThrow(/UNIQUE/)
   })
 })
+
+// ───────────── data migration: single place → event_places, legacy types → region|city|site ─────────────
+const apply = (d: DatabaseSync, files: string[]) => {
+  for (const f of files) for (const stmt of readFileSync(join(dir, f), 'utf8').split('--> statement-breakpoint')) d.exec(stmt)
+}
+const files = () => readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
+const old = () => files().filter((f) => /^000[01]_/.test(f))
+const upgrade = () => files().filter((f) => !/^000[01]_/.test(f))
+
+describe('migration: event_places + place types + Zamzam event', () => {
+  let d: DatabaseSync
+  const q = (sql: string) => d.prepare(sql).all() as Record<string, unknown>[]
+  beforeAll(() => {
+    d = new DatabaseSync(':memory:')
+    d.exec('PRAGMA foreign_keys = ON')
+    apply(d, old()) // the schema as it was in production before this change
+    d.exec(`
+      insert into eras(id,slug,order_index) values('e1','era',1);
+      insert into places(id,slug,type,lat,lng) values
+        ('seed-place-makkah','makkah','city',21.4225,39.826),('seed-place-hira','hira','cave',21.45,39.85),
+        ('seed-place-badr','badr','battlefield',23.7,38.7),('seed-place-mina','mina','valley',21.4,39.8),
+        ('seed-place-banu-sad','banu-sad','region',21,40.6),('seed-place-quba','quba','site',24.4,39.6);
+      insert into events(id,slug,era_id,order_index,place_id) values
+        ('ev-zamzam','abdul-muttalib-rediscovers-zamzam','e1',1,'seed-place-makkah'),
+        ('ev-elephant','year-of-the-elephant','e1',2,'seed-place-makkah'),
+        ('ev-badr','battle-of-badr','e1',3,'seed-place-badr'),
+        ('ev-none','no-place-yet','e1',4,NULL);
+    `)
+    apply(d, upgrade())
+  })
+
+  it('moves every existing events.place_id into event_places as primary', () => {
+    const rows = q("select e.slug, p.slug as place, ep.role from event_places ep join events e on e.id=ep.event_id join places p on p.id=ep.place_id order by e.slug, ep.order_index")
+    expect(rows).toEqual([
+      { slug: 'abdul-muttalib-rediscovers-zamzam', place: 'zamzam', role: 'primary' },
+      { slug: 'abdul-muttalib-rediscovers-zamzam', place: 'makkah', role: 'related' },
+      { slug: 'battle-of-badr', place: 'badr', role: 'primary' },
+      { slug: 'year-of-the-elephant', place: 'makkah', role: 'primary' },
+    ])
+    expect(q("select count(*) c from events where place_id is not null").at(0)!.c).toBe(3)
+    // every pre-existing link survived: 3 events had a place before
+    expect(q("select count(distinct event_id) c from event_places").at(0)!.c).toBe(3)
+  })
+  it('an event without a place gets no event_places row', () => {
+    expect(q("select count(*) c from event_places where event_id='ev-none'")[0]!.c).toBe(0)
+  })
+  it('legacy place types become region | city | site, with a zoom for the wide ones', () => {
+    const t = Object.fromEntries(q('select slug,type,zoom_override z from places').map((r) => [r.slug, [r.type, r.z]]))
+    expect(t.makkah).toEqual(['city', null])
+    expect(t['banu-sad']).toEqual(['region', null])
+    expect(t.hira).toEqual(['site', 15])
+    expect(t.badr).toEqual(['site', 13])
+    expect(t.mina).toEqual(['site', 13])
+    expect(t.quba).toEqual(['site', null])
+    expect(q("select count(*) c from places where type not in ('region','city','site')")[0]!.c).toBe(0)
+  })
+  it('seeds the two Makkah sites as unverified children of Makkah, with names', () => {
+    const r = q("select s.slug, s.type, s.verified, p.slug parent from places s left join places p on p.id=s.parent_place_id where s.slug in ('masjid-al-haram','zamzam') order by s.slug")
+    expect(r).toEqual([
+      { slug: 'masjid-al-haram', type: 'site', verified: 0, parent: 'makkah' },
+      { slug: 'zamzam', type: 'site', verified: 0, parent: 'makkah' },
+    ])
+    expect(q("select count(*) c from place_translations where place_id in ('seed-place-masjid-al-haram','seed-place-zamzam')")[0]!.c).toBe(6)
+  })
+  it('sets ONLY the Zamzam event to the Zamzam site; the elephant event keeps Makkah; events.place_id mirrors the primary', () => {
+    const prim = (slug: string) => q(`select p.slug s from event_places ep join events e on e.id=ep.event_id join places p on p.id=ep.place_id where e.slug='${slug}' and ep.role='primary'`)[0]!.s
+    expect(prim('abdul-muttalib-rediscovers-zamzam')).toBe('zamzam')
+    expect(prim('year-of-the-elephant')).toBe('makkah')
+    expect(q("select place_id from events where slug='abdul-muttalib-rediscovers-zamzam'")[0]!.place_id).toBe('seed-place-zamzam')
+    expect(q("select count(*) c from audit_log where tool like 'migration.0004%'")[0]!.c).toBe(1)
+  })
+  it('the database refuses a second primary place for one event', () => {
+    expect(() => d.exec("insert into event_places(event_id,place_id,role) values('ev-badr','seed-place-hira','primary')")).toThrow(/UNIQUE/)
+    d.exec("insert into event_places(event_id,place_id,role) values('ev-badr','seed-place-hira','related')")
+    expect(() => d.exec("insert into event_places(event_id,place_id,role) values('ev-badr','seed-place-hira','related')")).toThrow(/UNIQUE|PRIMARY/)
+  })
+  it('deleting an event or a place cleans up its links', () => {
+    d.exec("delete from events where id='ev-badr'")
+    expect(q("select count(*) c from event_places where event_id='ev-badr'")[0]!.c).toBe(0)
+  })
+  it('the data migrations are idempotent (running them again changes nothing)', () => {
+    const snap = () => JSON.stringify([q('select * from event_places order by 1,2'), q('select slug,type,zoom_override,parent_place_id from places order by slug'), q('select count(*) c from audit_log')])
+    const before = snap()
+    apply(d, upgrade().filter((f) => /^000[34]_/.test(f)))
+    expect(snap()).toBe(before)
+  })
+  it('a fresh database (no Makkah yet) migrates cleanly and inserts no sites; the seed adds them later', () => {
+    const f = new DatabaseSync(':memory:')
+    apply(f, files())
+    expect(f.prepare('select count(*) c from places').get()).toEqual({ c: 0 })
+  })
+  it('new media columns default sensibly', () => {
+    d.exec("insert into media(id,r2_key,kind,mime,bytes) values('m1','k','landscape','image/png',1)")
+    expect(q("select placement, after_key_detail_index a, order_index o, credit, width from media where id='m1'")[0]).toEqual({ placement: 'gallery', a: null, o: 0, credit: null, width: null })
+  })
+})

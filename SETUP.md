@@ -8,8 +8,8 @@ Nothing domain-specific is committed. Domains come from the environment (`DOMAIN
 | Resource | Name | Used by |
 |---|---|---|
 | D1 database | `seerah` (id in `apps/*/wrangler.jsonc`) | web, mcp, backup |
-| R2 bucket | `seerah-tiles` (`arabia.pmtiles`) | web |
-| R2 bucket | `seerah-media` (uploads, map/landscape/etc. only) | mcp |
+| R2 bucket | `seerah-tiles` (`arabia.pmtiles` z0-10, `makkah.pmtiles` z0-15) | web |
+| R2 bucket | `seerah-media` (uploads, map/landscape/etc. only) | mcp (read/write), web (read-only, `/media/<id>`) |
 | R2 bucket | `seerah-backups` (`d1/YYYY-MM-DD.jsonl.gz`, 30 days) | backup |
 | KV namespace | `seerah-oauth` | mcp (OAuth provider) |
 | Workers | `seerah-mcp`, `seerah-web`, `seerah-backup` | |
@@ -47,9 +47,9 @@ node scripts/render-wrangler.mjs
 pnpm --filter @seerah/db seed:sql --prod        # eras + gazetteer places only (places verified = 0). No events.
 (cd apps/mcp && npx wrangler d1 execute seerah --remote --yes --file ../../packages/db/seed/seed.prod.sql)
 
-# map tiles (needs the pmtiles CLI: https://github.com/protomaps/go-pmtiles/releases), ~32 MB
+# map tiles (needs the pmtiles CLI: https://github.com/protomaps/go-pmtiles/releases): arabia ~32 MB + makkah ~4 MB
 scripts/build-tiles.sh
-(cd apps/web && npx wrangler r2 object put seerah-tiles/arabia.pmtiles --file tiles/arabia.pmtiles --remote)
+(cd apps/web && for f in arabia makkah; do npx wrangler r2 object put seerah-tiles/$f.pmtiles --file tiles/$f.pmtiles --remote; done)
 
 # workers: mcp, web, backup
 (cd apps/mcp && npx wrangler deploy -c wrangler.deploy.jsonc)
