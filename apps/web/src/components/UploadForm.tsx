@@ -58,7 +58,7 @@ export function UploadForm({ token, endpoint }: { token: string; endpoint: strin
         <figure className="uppreview">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview} alt={f.t('upload.preview')} />
-          <figcaption>{file?.name} · {(file!.size / 1024 / 1024).toFixed(1)} MB</figcaption>
+          <figcaption>{file?.name} · {file!.size < 1024 * 1024 ? `${Math.max(1, Math.round(file!.size / 1024))} KB` : `${(file!.size / 1024 / 1024).toFixed(1)} MB`}</figcaption>
         </figure>
       ) : null}
       <label className="upcheck">

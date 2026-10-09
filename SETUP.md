@@ -80,6 +80,10 @@ Every attempt is written to `audit_log` (`auth.login`, `auth.csrf`, `auth.rate_l
 Passwords use PBKDF2-SHA256 with 100,000 iterations (the Workers maximum) and a per-user random salt; see
 `packages/auth/src/password.ts` for why not argon2id.
 
+## Pictures: uploads and resizing
+
+`seerah-mcp` has an Images binding (`images: { binding: "IMAGES" }` in `apps/mcp/wrangler.jsonc`): it makes the 480/960/1600 px webp copies. It needs no extra setup on a normal account; if it is unavailable the original (metadata already stripped) is stored alone. `seerah-web` has the `MCP_ORIGIN` variable (rendered from `DOMAIN` by `scripts/render-wrangler.mjs`): the one-time upload page sends the file to `https://mcp.<DOMAIN>/upload/<token>`, which allows CORS only for the site origin.
+
 ## Launch
 
 The site is `noindex` (`X-Robots-Tag`, meta robots, `robots.txt` disallow-all) until `INDEXING=on` is set at both build time
