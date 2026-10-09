@@ -10,12 +10,12 @@ describe('date and age labels (Bangla)', () => {
   it('uses Bengali digits and the before-Hijrah suffix for negative years', () => {
     expect(hijriLabel(f, -53)).toBe('৫৩ হি.পূ.')
     expect(hijriLabel(f, 1)).toBe('১ হি.')
-    expect(hijriLabel(f, null)).toBe('—')
+    expect(hijriLabel(f, null)).toBeNull()
     expect(gregLabel(f, 622)).toBe('আনু. ৬২২ খ্রি.')
   })
   it('age: before birth / birth / years', () => {
     expect(ageLabel(f, null, -53)).toBe('জন্মের আগে')
-    expect(ageLabel(f, null, 5)).toBe('—')
+    expect(ageLabel(f, null, 5)).toBeNull()
     expect(ageLabel(f, 0, -53)).toBe('জন্ম')
     expect(ageLabel(f, 40, -13)).toBe('৪০ বছর')
     expect(ageLabel(f, 40, -13, true)).toBe('বয়স ৪০')

@@ -4,6 +4,7 @@ const PORT = Number(process.env.E2E_PORT ?? 3100)
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
+  globalTimeout: 45 * 60_000, // nothing may hang forever
   expect: { timeout: 15_000 },
   retries: process.env.CI ? 1 : 0,
   workers: 1,

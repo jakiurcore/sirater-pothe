@@ -10,6 +10,11 @@ export const PATHS = {
   book: 'M4 19.5V5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2zM8 7h8',
   moon: 'M20.5 13.5A8.5 8.5 0 1 1 10.5 3.5a6.5 6.5 0 0 0 10 10z',
   chevron: 'M6 9l6 6 6-6',
+  plus: 'M12 5v14M5 12h14',
+  minus: 'M5 12h14',
+  target: 'M12 3v3M12 18v3M3 12h3M18 12h3M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
+  layers: 'M12 3 3 8l9 5 9-5-9-5zM3 12.5l9 5 9-5M3 17l9 5 9-5',
+  close: 'M6 6l12 12M18 6 6 18',
 } as const
 
 export function Icon({ d, size = 22, sw = 1.8, style }: { d: keyof typeof PATHS; size?: number; sw?: number; style?: CSSProperties }) {
@@ -25,4 +30,15 @@ export const GlobeIcon = () => (
 )
 export const SunIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+)
+
+/** Compass for the 3D view: the needle turns against the map's bearing, so it always points north. */
+export const CompassIcon = ({ bearing = 0 }: { bearing?: number }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="9.2" stroke="currentColor" strokeWidth="1.6" />
+    <g style={{ transform: `rotate(${-bearing}deg)`, transformOrigin: '12px 12px' }}>
+      <path d="M12 5.2 14.6 12H9.4z" fill="var(--primary)" />
+      <path d="M12 18.8 9.4 12h5.2z" fill="currentColor" opacity=".35" />
+    </g>
+  </svg>
 )

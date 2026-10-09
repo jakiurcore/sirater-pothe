@@ -79,7 +79,7 @@ async function live() {
       const page = await ctx.newPage()
       const state = 'state' in cfg ? cfg.state : STATE
       await page.addInitScript(([st, theme]) => {
-        try { if (st) localStorage.setItem('seerah:v1:reader', JSON.stringify(st)); if (theme) localStorage.setItem('seerah-theme', theme) } catch {}
+        try { if (st) localStorage.setItem('seerah:v1:reader', JSON.stringify(st)); if (theme) localStorage.setItem('seerah:theme', theme) } catch {}
       }, [state, cfg.theme ?? null])
       await page.goto(BASE + cfg.path, { waitUntil: 'load' })
       await page.waitForTimeout(id.includes('event') || id === 'timeline' ? 2500 : 900)

@@ -14,7 +14,7 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "predev": "node scripts/copy-maplibre.mjs",
     "prebuild": "node scripts/copy-maplibre.mjs",
-    "db:local": "wrangler d1 migrations apply seerah --local && wrangler d1 execute seerah --local --file ../../packages/db/seed/seed.dev.sql && wrangler r2 object put seerah-tiles/arabia.pmtiles --file tiles/arabia.pmtiles --local && wrangler r2 object put seerah-tiles/makkah.pmtiles --file tiles/makkah.pmtiles --local",
+    "db:local": "wrangler d1 migrations apply seerah --local && wrangler d1 execute seerah --local --file ../../packages/db/seed/seed.dev.sql && wrangler r2 object put seerah-tiles/arabia.pmtiles --file tiles/arabia.pmtiles --local && wrangler r2 object put seerah-tiles/makkah.pmtiles --file tiles/makkah.pmtiles --local && wrangler r2 object put seerah-tiles/terrain.pmtiles --file tiles/terrain.pmtiles --local",
     "e2e": "playwright test",
     "e2e:setup": "node e2e/setup.mjs"
   },
@@ -27,7 +27,8 @@
     "next": "16.3.8",
     "pmtiles": "^4.5.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "supercluster": "^9.1.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261008.1",
@@ -36,6 +37,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/supercluster": "^7.1.3",
     "sharp": "^0.35.5",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0",

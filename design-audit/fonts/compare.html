@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@500;600&family=Noto+Sans+Bengali:wght@500;600&family=Anek+Bangla:wght@500;600&family=Baloo+Da+2:wght@500;600&family=Tiro+Bangla&display=swap">
+<style>
+body{margin:0;padding:14px;font-family:system-ui;width:1500px;background:#888}
+.t{display:flex;gap:10px;margin-bottom:10px}
+.col{flex:1;border-radius:10px;padding:10px 12px}
+.light{background:#F3EBDD;color:#1E1A16;--hl:#2E6A61;--m:#5B5047}.dark{background:#0D1524;color:#EEE5D1;--hl:#7FBFB2;--m:#B8AD98}
+.n{font:700 12px system-ui;margin-bottom:6px;opacity:.75}
+.big{font-size:12px;font-weight:600;line-height:1.7}
+.big b{font-size:12px}
+.chosen .n::after{content:" ✔ chosen";color:var(--hl)}
+.k{color:var(--hl);font-size:13px;font-weight:600;margin-top:4px;line-height:1.7}
+.m{color:var(--m);font-size:12.5px;line-height:1.7;font-weight:500}
+.hi i{font-style:normal;outline:1.5px solid #c33;outline-offset:1px;border-radius:2px;margin-inline:1px}
+</style>
+<script>addEventListener('DOMContentLoaded',()=>{
+const F=[['Hind Siliguri','Hind Siliguri (current)'],['Noto Sans Bengali','Noto Sans Bengali'],['Anek Bangla','Anek Bangla'],['Baloo Da 2','Baloo Da 2'],['Tiro Bangla','Tiro Bangla']];
+for(const th of ['light','dark']){let h=`<div class="t">`;
+ for(const [fam,l] of F){h+=`<div class="col ${th} ${fam==='Noto Sans Bengali'?'chosen':''}" style="font-family:'${fam}'"><div class="n" style="font-family:system-ui">${l} · ${th}</div>
+ <div class="big">০ <span class="hi"><i>১</i></span> ২ ৩ ৪ ৫ <span class="hi"><i>৬</i></span> ৭ ৮ <span class="hi"><i>৯</i></span> &nbsp;<span style="font-size:13px">১২৩৪৫৬৭৮৯</span> <span style="font-size:14px">১২৩৪৫৬৭৮৯</span></div>
+ <div class="k">পর্ব ১ · ইসলামপূর্ব আরব ও জন্মের আগে · ঘটনা ৬ / ৬</div>
+ <div class="m">১ হি. · ৬২২ খ্রি. · ৫৩ বছর · ১৬ ঘটনা · ৯৯%</div>
+ <div class="m">পর্ব ৪ · হিজরত · ঘটনা ১১ / ১৬ · ১৯৯</div></div>`}
+ document.body.insertAdjacentHTML('beforeend',h+'</div>')}
+})</script>

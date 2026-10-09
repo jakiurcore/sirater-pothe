@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { missingHonorific } from '@seerah/content/honorific'
-import { getMessages, makeFmt, negotiateLang, uiLangs, ageLabel } from '@/lib/i18n'
+import { getMessages, makeFmt, negotiateLang, uiLangs, ageLabel, hijriLabel, gregLabel, dateFacts } from '@/lib/i18n'
 import bn from '@/messages/bn.json'
 import en from '@/messages/en.json'
 import ar from '@/messages/ar.json'
@@ -72,5 +72,29 @@ describe('percent', () => {
     expect(makeFmt('bn', getMessages('bn')).pct(40)).toBe('৪০%')
     expect(makeFmt('en', getMessages('en')).pct(40)).toBe('40%')
     expect(makeFmt('ar', getMessages('ar')).pct(40)).toMatch(/^٤٠.?٪/)
+  })
+})
+
+describe('date facts (no more dashes)', () => {
+  const f = makeFmt('bn', getMessages('bn'))
+  it('labels are null when the value is missing, never "—"', () => {
+    expect(hijriLabel(f, null)).toBeNull()
+    expect(gregLabel(f, null)).toBeNull()
+    expect(ageLabel(f, null, null)).toBeNull()
+    expect(ageLabel(f, null, -60)).toBe(f.t('age.before')) // still "before his birth" for early lineage events
+  })
+  it('an event with no date at all gets one short label in every language', () => {
+    for (const l of ['bn', 'en', 'ar'] as const) {
+      const g = makeFmt(l, getMessages(l))
+      expect(dateFacts(g, null, null, null)).toEqual([g.t('event.noDate')])
+    }
+    expect(dateFacts(f, null, null, null)).toEqual(['নির্দিষ্ট সময় নেই'])
+  })
+  it('only the facts that exist are listed', () => {
+    expect(dateFacts(f, 1, 622, null)).toHaveLength(2)
+    expect(dateFacts(f, -13, null, 40)).toHaveLength(2)
+    expect(dateFacts(f, 1, 622, 53)).toHaveLength(3)
+    expect(dateFacts(f, null, 575, null)).toEqual([gregLabel(f, 575)!])
+    for (const parts of [dateFacts(f, 1, null, null), dateFacts(f, null, null, null)]) expect(parts.join(' ')).not.toContain('—')
   })
 })

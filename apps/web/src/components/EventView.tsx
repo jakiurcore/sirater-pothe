@@ -29,6 +29,17 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
   const f = makeFmt(lang, getMessages(lang))
   const c = page.card
   const idx = f.t('event.idx', { i: page.index, total: page.total })
+  // Only the facts the event has. With no date at all (e.g. a lineage event) one "no specific date" cell replaces three dashes.
+  const dates: [string, string, string | null][] = [
+    ['hijri', f.t('event.hijri'), hijriLabel(f, c.hijriYear)],
+    ['greg', f.t('event.greg'), gregLabel(f, c.gregorianApprox)],
+    ['age', f.t('event.age'), ageLabel(f, c.prophetAge, c.hijriYear)],
+  ]
+  const have = dates.filter((d): d is [string, string, string] => d[2] !== null)
+  const facts: [string, string, string][] = [
+    ...(have.length ? have : [['when', f.t('event.when'), f.t('event.noDate')] as [string, string, string]]),
+    ...(page.placeLabel ? [['place', f.t('event.place'), page.placeLabel] as [string, string, string]] : []),
+  ]
   const hasBody = page.keyDetails.length > 0 || page.lessons.length > 0 || page.sources.length > 0 || page.media.length > 0
   // Pictures sit exactly where their structured placement says (the same in preview and when published).
   const at = (p: MediaItem['placement']) => page.media.filter((m) => m.placement === p)
@@ -57,12 +68,11 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
           {page.textLang !== lang ? <p className="stub">{f.t('event.fallbackLang')}</p> : null}
           <span className="kicker">{f.t('event.kicker', { n: page.eraN, era: page.eraTitle, idx })}</span>
           <h1>{c.title}</h1>
-          <dl className="facts">
-            <div><dt>{f.t('event.hijri')}</dt><dd>{hijriLabel(f, c.hijriYear)}</dd></div>
-            <div><dt>{f.t('event.greg')}</dt><dd>{gregLabel(f, c.gregorianApprox)}</dd></div>
-            <div><dt>{f.t('event.age')}</dt><dd>{ageLabel(f, c.prophetAge, c.hijriYear)}</dd></div>
-            <div><dt>{f.t('event.place')}</dt><dd>{page.placeLabel ?? '—'}</dd></div>
-          </dl>
+          {facts.length ? (
+            <dl className="facts">
+              {facts.map(([k, label, value]) => <div key={k}><dt>{label}</dt><dd>{value}</dd></div>)}
+            </dl>
+          ) : null}
           {page.certainty === 'agreed' ? (
             <span className="agreed"><Icon d="check" size={14} sw={2.6} />{f.t('event.agreed')}</span>
           ) : (

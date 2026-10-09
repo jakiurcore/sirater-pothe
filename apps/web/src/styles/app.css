@@ -18,11 +18,11 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 [data-motion="reduced"] *,[data-motion="reduced"] *::before,[data-motion="reduced"] *::after{animation:none!important;transition:none!important}
 
 /* ───── app frame ───── */
-.app{min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink)}
+.app{min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);padding-inline:env(safe-area-inset-left) env(safe-area-inset-right);padding-block-start:env(safe-area-inset-top)}
 .app-body{flex:1;min-width:0;display:flex;flex-direction:column}
 .page{width:100%;max-width:720px;margin-inline:auto;flex:1}
 .mob-only{display:flex}.desk-only{display:none}
-@media (min-width:900px){.mob-only{display:none!important}.desk-only{display:flex}}
+@media (min-width:900px) and (min-height:520px){.mob-only{display:none!important}.desk-only{display:flex}}
 
 /* mobile tab bar */
 .tabbar{position:sticky;inset-block-end:0;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border-block-start:1px solid var(--line);padding-block:6px 10px;padding-inline:4px;padding-block-end:max(10px,env(safe-area-inset-bottom))}
@@ -66,7 +66,7 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .hero .ar{position:relative;font:700 40px/1.8 var(--f-ar);color:var(--primary-strong)}
 .hero .sub{position:relative;font:500 13px/1.6 var(--f-ui);color:var(--ink-2)}
 .intro{padding:24px 20px 4px;display:flex;flex-direction:column;gap:10px}
-.intro h1{font:700 26px/1.45 var(--f-ui);color:var(--ink)}
+.intro h1{font:700 26px/1.45 var(--f-ui);color:var(--ink);text-wrap:balance}
 .intro p{font:400 17px/1.85 var(--f-read);color:var(--ink-2);text-wrap:pretty}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:14px}
 .cont{padding:18px 16px 0}
@@ -149,7 +149,7 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 /* ───── split (desktop) ───── */
 .split{flex:1;min-height:0;display:block}
 .split>aside{display:none}
-@media (min-width:900px){
+@media (min-width:900px) and (min-height:520px){
   .app.has-split{height:100dvh}
   .split{display:grid;grid-template-columns:400px minmax(0,1fr);overflow:hidden}
   .split>aside{display:flex;min-height:0;overflow-y:auto;border-inline-end:1px solid var(--line);padding:24px 18px 32px;flex-direction:column;gap:18px}
@@ -172,7 +172,7 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .backbar>span{font:500 13px/1 var(--f-ui);color:var(--ink-2)}
 .stage{position:relative;background:var(--map-sea);border-block-end:1px solid var(--line)}
 .mapbox{position:relative;width:100%;height:300px;overflow:hidden;background:var(--map-sea)}
-@media (min-width:900px){.mapbox{height:380px}}
+@media (min-width:900px) and (min-height:520px){.mapbox{height:380px}}
 .mapbox .maplibregl-canvas{outline:none}
 .mapbox .maplibregl-ctrl-attrib{font:400 11px/1.4 var(--f-ui);background:color-mix(in srgb,var(--surface) 80%,transparent);color:var(--ink-2)}
 .mapbox .maplibregl-ctrl-attrib a{color:var(--ink-2)}
@@ -187,10 +187,39 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .mapmk.hl i{width:12px;height:12px;inset-inline-start:-6px;inset-block-start:-6px;background:var(--gold)}
 .mapmk.hl::after{content:"";position:absolute;inset-inline-start:-7px;inset-block-start:-7px;width:14px;height:14px;border-radius:50%;border:1.5px solid var(--gold);animation:seerahPulse 3.2s cubic-bezier(.2,0,0,1) infinite}
 .mapfail{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;font:500 14px/1.7 var(--f-ui);color:var(--ink-2)}
-.seg{position:absolute;inset-block-start:12px;inset-inline-end:12px;z-index:2;display:flex;padding:2px;border-radius:999px;background:var(--surface);border:1px solid var(--line);box-shadow:0 1px 3px rgba(20,16,10,.08)}
-.seg .on{min-height:40px;display:flex;align-items:center;padding-inline:14px;border-radius:999px;background:var(--primary);color:var(--on-primary);font:600 13px/1.2 var(--f-ui)}
-.seg .off{min-height:40px;display:flex;align-items:center;gap:6px;padding-inline:12px;border-radius:999px;color:var(--ink-2);font:500 13px/1.2 var(--f-ui)}
-.seg .off em{font-style:normal;font-size:11px;padding:1px 6px;border-radius:999px;background:var(--surface-2)}
+.seg{position:absolute;inset-block-start:12px;inset-inline-end:12px;z-index:3;display:flex;padding:2px;border-radius:999px;background:var(--surface);border:1px solid var(--line);box-shadow:0 1px 3px rgba(20,16,10,.08)}
+.seg button{min-height:44px;display:flex;align-items:center;gap:6px;padding-inline:14px;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:500 13px/1.2 var(--f-ui);cursor:pointer}
+.seg button.on{background:var(--primary);color:var(--on-primary);font-weight:600}
+.seg button:disabled{opacity:.45;cursor:not-allowed}
+.seg button:focus-visible,.mapctl button:focus-visible,.mapchip:focus-visible,.placecard button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+/* map controls: the design's pill language (surface, hairline border, soft shadow), 44px targets */
+.mapctl{position:absolute;inset-block-start:64px;inset-inline-end:12px;z-index:3;display:flex;flex-direction:column;gap:4px}
+.mapctl.start{inset-inline-end:auto;inset-inline-start:12px}
+.mapctl button{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:0 1px 3px rgba(20,16,10,.08);cursor:pointer;padding:0}
+.mapctl button:hover:not(:disabled){border-color:var(--primary);color:var(--primary-strong)}
+.mapctl button:disabled{opacity:.4;cursor:not-allowed}
+.mapchip{position:absolute;inset-block-start:12px;inset-inline-start:12px;z-index:3;min-height:48px;display:flex;align-items:center;gap:6px;padding-inline:12px 14px;border-radius:999px;background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:0 1px 3px rgba(20,16,10,.08);font:600 13px/1.2 var(--f-ui);cursor:pointer}
+.mapchip[aria-pressed="true"]{background:var(--primary-tint);border-color:var(--primary);color:var(--primary-strong)}
+@media (max-width:359.98px){.mapchip span{display:none}.mapchip{padding-inline:12px}}
+/* other places: smaller, quieter markers; a 44px invisible hit area keeps them tappable */
+.mapmk .hit{position:absolute;inset-inline-start:-22px;inset-block-start:-22px;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer;z-index:1}
+.mapmk.oth i{width:7px;height:7px;inset-inline-start:-3.5px;inset-block-start:-3.5px;background:var(--surface);border:1.5px solid var(--map-marker);box-sizing:border-box;translate:none;opacity:.9}
+.maplbl.oth{font-weight:500;font-size:12px;color:var(--ink-2)}
+.mapmk.cl .hit{inset-inline-start:-16px;inset-block-start:-16px;width:32px;height:32px;display:grid;place-items:center;background:var(--surface);border:1.5px solid var(--map-marker);color:var(--primary-strong);font:700 12px/1 var(--f-meta);box-shadow:0 1px 3px rgba(20,16,10,.15)}
+.mapmk.cl .hit::before{content:"";position:absolute;inset:-6px}
+.placecard{position:absolute;z-index:6;inset-inline:12px;inset-block-end:12px;max-width:340px;max-height:calc(100% - 24px);display:flex;flex-direction:column;border-radius:18px;background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:0 8px 24px rgba(20,16,10,.18);outline:none;overflow:hidden}
+.placecard .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:12px 6px 6px 16px}
+.placecard .pt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.placecard .pt b{font:700 17px/1.45 var(--f-ui)}
+.placecard .pt span{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font:500 13px/1.5 var(--f-ui);color:var(--ink-2)}
+.placecard .unv{font-style:normal;font:600 11.5px/1.4 var(--f-ui);padding:1px 8px;border-radius:999px;background:var(--gold-tint);color:var(--gold-ink)}
+.placecard .px{flex:none;width:44px;height:44px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--ink);cursor:pointer}
+.placecard .pb{padding:0 16px 14px;overflow-y:auto;overscroll-behavior:contain}
+.placecard h4{font:600 13px/1.5 var(--f-ui);color:var(--ink-2);margin:4px 0 2px}
+.placecard ul{display:flex;flex-direction:column}
+.placecard li a{display:flex;align-items:center;min-height:44px;color:var(--primary-strong);font:600 15px/1.5 var(--f-ui);text-decoration:none;border-block-start:1px solid var(--line)}
+.placecard li:first-child a{border-block-start:0}
+.placecard p{font:400 14px/1.7 var(--f-ui);color:var(--ink-2);margin:2px 0}
 .routelegend{position:absolute;inset-block-end:12px;inset-inline-start:12px;z-index:2;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font:500 12.5px/1.3 var(--f-ui);color:var(--ink-2)}
 .routelegend i{width:20px;height:3px;background:var(--primary);border-radius:2px}
 
@@ -344,8 +373,9 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 /* ───── map attribution: ODbL requires it; keep it, but with 44px touch targets ───── */
 .mapbox .maplibregl-ctrl-attrib a{display:inline-flex;align-items:center;min-height:44px;padding-inline:4px}
 .mapbox .maplibregl-ctrl-attrib-button{width:44px;height:44px;background-repeat:no-repeat;background-position:center;background-size:20px}
-.mapbox .maplibregl-ctrl-attrib.maplibregl-compact{min-height:44px;min-width:44px;border-radius:22px}
-.mapbox .maplibregl-ctrl-attrib-inner{display:flex;align-items:center;flex-wrap:wrap}
+.mapbox .maplibregl-ctrl-attrib.maplibregl-compact{min-height:44px;min-width:44px;border-radius:22px;background:var(--surface);border:1px solid var(--line);box-shadow:0 1px 3px rgba(20,16,10,.08);color:var(--ink-2)}
+[data-theme="dark"] .mapbox .maplibregl-ctrl-attrib-button{filter:invert(1)}
+.mapbox .maplibregl-ctrl-attrib:not(.maplibregl-compact) .maplibregl-ctrl-attrib-inner,.mapbox .maplibregl-compact-show .maplibregl-ctrl-attrib-inner{display:flex;align-items:center;flex-wrap:wrap}
 
 /* ───── 600–899px: the mobile layout, in a centred reading column (the design only defines 390 and 1280) ───── */
 @media (min-width:600px) and (max-width:899.98px){
@@ -365,3 +395,14 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .pic figcaption small{font:400 12px/1.5 var(--f-ui);color:var(--ink-3)}
 .keys li.keypic{display:block;margin-inline-start:42px}
 @media (max-width:420px){.keys li.keypic{margin-inline-start:0}}
+
+/* ───── meta text and numerals ─────
+   ONE variable and ONE rule for every small meta/subtitle line that carries Bangla digits (eyebrow, era labels, counters, the Hijri /
+   Gregorian / age row, timeline meta, progress numbers, banners). Body and headings keep their fonts. */
+:root{--f-meta:var(--font-noto-sans-bn),var(--f-ui)}
+.meta,.ev .kicker,.backbar>span,.facts dt,.facts dd,.pagehead span,.tl header .top span,.tl header .pr span,.tl li .m,.tl li .pl,.aside-head .pr span,.aside-head>span,
+.eras .hd span,.eracard .tx .sm,.eracard .mini span.r,.cont .lbl,.cont .meta .era,.cont .meta span,.circ,.keys li b,.badge,.duepill,.dueline span.x,.revhead div span,
+.revtop span,.ring b,.ring span,.rtx b,.rtx span,.strk b,.strk span,.week .wl,.erarow>div:first-child span,.notecard>span:first-child span,.draftbanner span,
+.eras .hd h2 span,.rates button span,.sum-count{font-family:var(--f-meta)}
+
+.ev .kicker{text-wrap:balance}

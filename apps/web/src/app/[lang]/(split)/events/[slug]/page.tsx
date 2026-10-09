@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: P): Promise<Metadata> {
   const url = `/${lang}/events/${slug}`
   return {
     title: page.card.title,
-    description: `${hijriLabel(f, page.card.hijriYear)} · ${gregLabel(f, page.card.gregorianApprox)} — ${desc}`,
+    description: `${[hijriLabel(f, page.card.hijriYear), gregLabel(f, page.card.gregorianApprox)].filter(Boolean).join(' · ')}${page.card.hijriYear != null || page.card.gregorianApprox != null ? ' — ' : ''}${desc}`,
     // Pages that fall back to another language's text are not indexed; hreflang lists only real translations.
     // Spread, not `robots: undefined`: an explicit undefined would wipe the layout's pre-launch noindex.
     ...(page.textLang === lang ? {} : { robots: { index: false, follow: true } }),

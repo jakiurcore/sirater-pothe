@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 
-export const TOKENS = { valid: 'e2e-valid-preview-token-0123456789', expired: 'e2e-expired-preview-token-0123456789', other: 'e2e-other-event-token-0123456789', long: 'e2e-long-title-preview-token-0123456789', media: 'e2e-media-draft-preview-token-0123456789', site: 'e2e-site-only-preview-token-0123456789', region: 'e2e-region-only-preview-token-0123456789', far: 'e2e-far-site-preview-token-0123456789' }
+export const TOKENS = { valid: 'e2e-valid-preview-token-0123456789', expired: 'e2e-expired-preview-token-0123456789', other: 'e2e-other-event-token-0123456789', long: 'e2e-long-title-preview-token-0123456789', media: 'e2e-media-draft-preview-token-0123456789', site: 'e2e-site-only-preview-token-0123456789', region: 'e2e-region-only-preview-token-0123456789', far: 'e2e-far-site-preview-token-0123456789', nodate: 'e2e-nodate-preview-token-0123456789' }
 const h = (t) => createHash('sha256').update(t).digest('hex')
 const future = new Date(Date.now() + 24 * 3600e3).toISOString()
 const past = new Date(Date.now() - 3600e3).toISOString()
@@ -31,14 +31,14 @@ const picRows = (eventId, pub) => PICS.map((p, i) => `INSERT INTO media (id, r2_
 INSERT INTO media_alt (media_id, lang, alt, caption) VALUES ('${mediaId(i, pub)}', 'bn', '${p.alt}', ${p.caption ? `'${p.caption}'` : 'NULL'});`).join('\n')
 const KD = JSON.stringify(['প্রথম বিবরণ: জমজম কূপের পুনরুদ্ধার।', 'দ্বিতীয় বিবরণ: কূপ খননের স্থান নির্ণয়।', 'তৃতীয় বিবরণ: কূপের পানি নিয়ে মানুষের আগ্রহ।'])
 const LS = JSON.stringify(['ধৈর্য ও অধ্যবসায়ের ফল পাওয়া যায়।'])
-const fixtureEvent = (id, order, status, extra = '') => `INSERT INTO events (id, slug, era_id, order_index, hijri_year, gregorian_approx, prophet_age, place_id, certainty, status, needs_verification${status === 'published' ? ', published_at' : ''})
-  VALUES ('${id}', '${id}', 'seed-era-childhood-and-youth', ${order}, -50, 575, 3, ${extra || 'NULL'}, 'agreed', '${status}', ${status === 'published' ? 0 : 1}${status === 'published' ? ", '2026-01-01T00:00:00.000Z'" : ''});
+const fixtureEvent = (id, order, status, extra = '', dates = '-50, 575, 3') => `INSERT INTO events (id, slug, era_id, order_index, hijri_year, gregorian_approx, prophet_age, place_id, certainty, status, needs_verification${status === 'published' ? ', published_at' : ''})
+  VALUES ('${id}', '${id}', 'seed-era-childhood-and-youth', ${order}, ${dates}, ${extra || 'NULL'}, 'agreed', '${status}', ${status === 'published' ? 0 : 1}${status === 'published' ? ", '2026-01-01T00:00:00.000Z'" : ''});
 INSERT INTO event_translations (event_id, lang, title, summary, key_details, lessons, status)
   VALUES ('${id}', 'bn', 'ছবি ও স্থানের পরীক্ষা (${id})', 'এই ঘটনাটি কেবল পরীক্ষার জন্য: একাধিক স্থান ও সব অবস্থানে ছবি।', '${KD}', '${LS}', '${status === 'published' ? 'published' : 'draft'}');`
 
 const mediaSql = `
 DELETE FROM media WHERE id LIKE 'e2e%' OR r2_key LIKE 'media/e2e-pic-%';
-DELETE FROM events WHERE id IN ('e2e-media-pub', 'e2e-media', 'e2e-site', 'e2e-region', 'e2e-far');
+DELETE FROM events WHERE id IN ('e2e-media-pub', 'e2e-media', 'e2e-site', 'e2e-region', 'e2e-far', 'e2e-nodate');
 ${fixtureEvent('e2e-media', 999001, 'draft', "'seed-place-zamzam'")}
 INSERT INTO event_places (event_id, place_id, role, order_index) VALUES ('e2e-media', 'seed-place-zamzam', 'primary', 0), ('e2e-media', 'seed-place-masjid-al-haram', 'related', 1), ('e2e-media', 'seed-place-makkah', 'related', 2);
 ${picRows('e2e-media', false)}
@@ -53,6 +53,9 @@ INSERT INTO event_places (event_id, place_id, role, order_index) VALUES ('e2e-si
 ${fixtureEvent('e2e-far', 999005, 'draft', "'seed-place-badr'")}
 INSERT INTO event_places (event_id, place_id, role, order_index) VALUES ('e2e-far', 'seed-place-badr', 'primary', 0);
 INSERT INTO preview_tokens (token_hash, event_id, expires_at, created_by) VALUES ('${h(TOKENS.far)}', 'e2e-far', '2099-01-01T12:00:00.000Z', 'e2e');
+${fixtureEvent('e2e-nodate', 999006, 'draft', "'seed-place-makkah'", 'NULL, NULL, NULL')}
+INSERT INTO event_places (event_id, place_id, role, order_index) VALUES ('e2e-nodate', 'seed-place-makkah', 'primary', 0);
+INSERT INTO preview_tokens (token_hash, event_id, expires_at, created_by) VALUES ('${h(TOKENS.nodate)}', 'e2e-nodate', '2099-01-01T12:00:00.000Z', 'e2e');
 ${fixtureEvent('e2e-region', 999004, 'draft', "'seed-place-banu-sad'")}
 INSERT INTO event_places (event_id, place_id, role, order_index) VALUES ('e2e-region', 'seed-place-banu-sad', 'primary', 0);
 INSERT INTO preview_tokens (token_hash, event_id, expires_at, created_by) VALUES ('${h(TOKENS.media)}', 'e2e-media', '2099-01-01T12:00:00.000Z', 'e2e');
@@ -85,7 +88,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const f = join(tmpdir(), 'seerah-e2e.sql')
   writeFileSync(f, sql)
   run('d1', 'execute', 'seerah', '--local', '--file', f)
-  for (const t of ['arabia', 'makkah']) run('r2', 'object', 'put', `seerah-tiles/${t}.pmtiles`, '--file', `tiles/${t}.pmtiles`, '--local')
+  for (const t of ['arabia', 'makkah', 'terrain']) run('r2', 'object', 'put', `seerah-tiles/${t}.pmtiles`, '--file', `tiles/${t}.pmtiles`, '--local')
   // Pictures for the gallery fixtures (local R2 "seerah-media"): abstract patterns, no people.
   for (const p of PICS) {
     const file = join(tmpdir(), `${p.id}.png`)

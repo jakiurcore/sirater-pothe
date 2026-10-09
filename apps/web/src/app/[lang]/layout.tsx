@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { notFound } from 'next/navigation'
-import { Hind_Siliguri, Noto_Serif_Bengali, Amiri } from 'next/font/google'
+import { Hind_Siliguri, Noto_Serif_Bengali, Noto_Sans_Bengali, Amiri } from 'next/font/google'
 import Link from 'next/link'
 import Script from 'next/script'
 import '@/styles/tokens.css'
@@ -14,6 +14,8 @@ import { THEME_SCRIPT } from '@/lib/theme'
 
 const hind = Hind_Siliguri({ subsets: ['bengali', 'latin'], weight: ['400', '500', '600', '700'], display: 'swap', variable: '--font-hind' })
 const notoSerif = Noto_Serif_Bengali({ subsets: ['bengali', 'latin'], display: 'swap', variable: '--font-noto-serif' })
+/** Meta/subtitle text and numerals only (see --f-meta in app.css): Hind Siliguri's "১" is half-height and reads as ৬/৭ at 12–14px; Noto Sans Bengali's digits are distinct. Bengali glyphs only; Latin falls back to the UI font. */
+const notoSansBn = Noto_Sans_Bengali({ subsets: ['bengali'], weight: ['500', '600', '700'], display: 'swap', variable: '--font-noto-sans-bn' })
 const amiri = Amiri({ subsets: ['arabic', 'latin'], weight: ['400', '700'], display: 'swap', variable: '--font-amiri' })
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +23,7 @@ export const dynamic = 'force-dynamic'
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover', // lets env(safe-area-inset-*) work (notch in landscape, home bar)
   themeColor: [{ media: '(prefers-color-scheme: light)', color: '#F3EBDD' }, { media: '(prefers-color-scheme: dark)', color: '#0D1524' }],
 }
 
@@ -47,7 +50,7 @@ export default async function LangLayout({ children, params }: { children: React
   const [timeline, recall] = await Promise.all([getTimeline(lang), getRecallIndex(lang)])
   const langs = uiLangs()
   return (
-    <html lang={lang} dir={dirOf(lang)} className={`${hind.variable} ${notoSerif.variable} ${amiri.variable}`} suppressHydrationWarning>
+    <html lang={lang} dir={dirOf(lang)} className={`${hind.variable} ${notoSerif.variable} ${notoSansBn.variable} ${amiri.variable}`} suppressHydrationWarning>
       <head>
         {langs.map((l) => <link key={l} rel="alternate" hrefLang={l} href={`/${l}`} />)}
       </head>

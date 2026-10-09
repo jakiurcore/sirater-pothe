@@ -20,7 +20,7 @@ const STATE = {
 async function setup(page: Page, opts: { state?: object | null; theme?: 'dark' } = {}) {
   await page.clock.install({ time: NOW })
   await page.addInitScript(([st, theme]) => {
-    try { if (st) localStorage.setItem('seerah:v1:reader', JSON.stringify(st)); if (theme) localStorage.setItem('seerah-theme', theme as string) } catch { /* private mode */ }
+    try { if (st) localStorage.setItem('seerah:v1:reader', JSON.stringify(st)); if (theme) localStorage.setItem('seerah:theme', theme as string) } catch { /* private mode */ }
   }, [opts.state === undefined ? STATE : opts.state, opts.theme ?? null] as const)
 }
 async function settle(page: Page) {

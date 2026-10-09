@@ -1,0 +1,578 @@
+{
+ "home@360-light": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 204→304 x 100×44",
+   "iconbtn 306→350 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "সীরাতের পথে 25/19px",
+   "السيرة النبو 22/13px"
+  ],
+  "menu": "124→304 y62-208"
+ },
+ "timeline@360-light": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 93,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "event@360-light": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 52,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "review@360-light": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 132,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "progress@360-light": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 61,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "home-en@360-light": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 95,
+  "tools": [
+   "langbtn 192→304 x 112×44",
+   "iconbtn 306→350 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "The Path of  49/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home-ar@360-light": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 56→153 x 97×44",
+   "iconbtn 10→54 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "على طريق الس 25/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home@360-dark": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 204→304 x 100×44",
+   "iconbtn 306→350 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "সীরাতের পথে 25/19px",
+   "السيرة النبو 22/13px"
+  ],
+  "menu": "124→304 y62-208"
+ },
+ "timeline@360-dark": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 93,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "event@360-dark": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 52,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "review@360-dark": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 132,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "progress@360-dark": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 61,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "home-en@360-dark": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 95,
+  "tools": [
+   "langbtn 192→304 x 112×44",
+   "iconbtn 306→350 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "The Path of  49/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home-ar@360-dark": {
+  "vw": 360,
+  "sw": 360,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 56→153 x 97×44",
+   "iconbtn 10→54 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "على طريق الس 25/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home@390-light": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 234→334 x 100×44",
+   "iconbtn 336→380 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "সীরাতের পথে 25/19px",
+   "السيرة النبو 22/13px"
+  ],
+  "menu": "154→334 y62-208"
+ },
+ "timeline@390-light": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 93,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "event@390-light": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 52,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "review@390-light": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 87,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "progress@390-light": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 61,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "home-en@390-light": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 95,
+  "tools": [
+   "langbtn 222→334 x 112×44",
+   "iconbtn 336→380 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "The Path of  49/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home-ar@390-light": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 56→153 x 97×44",
+   "iconbtn 10→54 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "على طريق الس 25/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home@390-dark": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 234→334 x 100×44",
+   "iconbtn 336→380 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "সীরাতের পথে 25/19px",
+   "السيرة النبو 22/13px"
+  ],
+  "menu": "154→334 y62-208"
+ },
+ "timeline@390-dark": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 93,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "event@390-dark": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 52,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "review@390-dark": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 87,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "progress@390-dark": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 61,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "home-en@390-dark": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 95,
+  "tools": [
+   "langbtn 222→334 x 112×44",
+   "iconbtn 336→380 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "The Path of  49/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home-ar@390-dark": {
+  "vw": 390,
+  "sw": 390,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 56→153 x 97×44",
+   "iconbtn 10→54 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "على طريق الس 25/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home@430-light": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 274→374 x 100×44",
+   "iconbtn 376→420 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "সীরাতের পথে 25/19px",
+   "السيرة النبو 22/13px"
+  ],
+  "menu": "194→374 y62-208"
+ },
+ "timeline@430-light": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 93,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "event@430-light": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 52,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "review@430-light": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 87,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "progress@430-light": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 61,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "home-en@430-light": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 262→374 x 112×44",
+   "iconbtn 376→420 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "The Path of  25/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home-ar@430-light": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 56→153 x 97×44",
+   "iconbtn 10→54 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "على طريق الس 25/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home@430-dark": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 274→374 x 100×44",
+   "iconbtn 376→420 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "সীরাতের পথে 25/19px",
+   "السيرة النبو 22/13px"
+  ],
+  "menu": "194→374 y62-208"
+ },
+ "timeline@430-dark": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 93,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "event@430-dark": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 52,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "review@430-dark": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 87,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "progress@430-dark": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 61,
+  "tools": [],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": []
+ },
+ "home-en@430-dark": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 262→374 x 112×44",
+   "iconbtn 376→420 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "The Path of  25/19px",
+   "السيرة النبو 22/13px"
+  ]
+ },
+ "home-ar@430-dark": {
+  "vw": 430,
+  "sw": 430,
+  "headTop": 0,
+  "headH": 71,
+  "tools": [
+   "langbtn 56→153 x 97×44",
+   "iconbtn 10→54 x 44×44"
+  ],
+  "clipped": [],
+  "over": [],
+  "tabH": 73,
+  "lineHeights": [
+   "على طريق الس 25/19px",
+   "السيرة النبو 22/13px"
+  ]
+ }
+}

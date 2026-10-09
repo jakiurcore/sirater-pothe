@@ -67,11 +67,16 @@ export function makeFmt(lang: Lang, messages: Messages): Fmt {
 }
 
 /** Display labels for event dates. Hijri years before the Hijrah are negative; there is no year 0. */
-export const hijriLabel = (f: Fmt, y: number | null) => (y == null ? '—' : y < 0 ? f.t('date.hijriBefore', { n: -y }) : f.t('date.hijri', { n: y }))
-export const gregLabel = (f: Fmt, y: number | null) => (y == null ? '—' : f.t('date.greg', { n: y }))
-/** Birth year is -53 AH; events with no age before that are "before the birth". */
-export function ageLabel(f: Fmt, age: number | null, hijri: number | null, short = false) {
-  if (age == null) return hijri != null && hijri <= -53 ? f.t('age.before') : '—'
+export const hijriLabel = (f: Fmt, y: number | null): string | null => (y == null ? null : y < 0 ? f.t('date.hijriBefore', { n: -y }) : f.t('date.hijri', { n: y }))
+export const gregLabel = (f: Fmt, y: number | null): string | null => (y == null ? null : f.t('date.greg', { n: y }))
+export function ageLabel(f: Fmt, age: number | null, hijri: number | null, short = false): string | null {
+  if (age == null) return hijri != null && hijri <= -53 ? f.t('age.before') : null
   if (age === 0) return f.t('age.birth')
   return short ? f.t('age.short', { n: age }) : f.t('age.long', { n: age })
+}
+
+/** The date facts an event has (Hijri, Gregorian, age); with none at all (a lineage event) one "no specific date" label instead of dashes. */
+export function dateFacts(f: Fmt, hijri: number | null, greg: number | null, age: number | null, short = false): string[] {
+  const parts = [hijriLabel(f, hijri), gregLabel(f, greg), ageLabel(f, age, hijri, short)].filter((x): x is string => !!x)
+  return parts.length ? parts : [f.t('event.noDate')]
 }

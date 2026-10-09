@@ -347,3 +347,45 @@ export async function getRecallQuestions(lang: Lang): Promise<RecallQuestion[]> 
   }
   return out
 }
+
+// ───────── places index (map "other places" layer) ─────────
+export interface PlaceIndexItem {
+  slug: string
+  name: string
+  type: PlaceType
+  lat: number
+  lng: number
+  verified: boolean
+  /** Published events linked to this place (any role), in timeline order. */
+  events: { slug: string; title: string }[]
+}
+
+/** Every place with the published events that use it. Names and titles in `lang`, falling back to the default language. */
+export async function getPlacesIndex(lang: Lang): Promise<PlaceIndexItem[]> {
+  const db = await getDatabase()
+  const [places, names, tl, links] = await Promise.all([
+    db.select().from(s.places).orderBy(asc(s.places.slug)),
+    db.select().from(s.placeTranslations),
+    loadTimeline(db, lang),
+    db.select({ eventId: s.eventPlaces.eventId, placeId: s.eventPlaces.placeId }).from(s.eventPlaces),
+  ])
+  const nameBy = groupBy(names, (n) => n.placeId)
+  const byEvent = new Map(tl.events.map((e) => [e.id, e]))
+  const legacy = await db.select({ id: s.events.id, placeId: s.events.placeId }).from(s.events).where(eq(s.events.status, 'published'))
+  const pairs = [...links, ...legacy.filter((e) => e.placeId).map((e) => ({ eventId: e.id, placeId: e.placeId! }))]
+  const eventsBy = new Map<string, Map<string, { slug: string; title: string }>>()
+  for (const { eventId, placeId } of pairs) {
+    const ev = byEvent.get(eventId)
+    if (!ev) continue // not published (or no usable translation)
+    const m = eventsBy.get(placeId) ?? new Map()
+    m.set(ev.slug, { slug: ev.slug, title: ev.title })
+    eventsBy.set(placeId, m)
+  }
+  const order = new Map(tl.events.map((e, i) => [e.slug, i]))
+  return places.map((p) => ({
+    slug: p.slug,
+    name: pick(nameBy.get(p.id) ?? [], lang, true)?.name ?? p.slug,
+    type: p.type as PlaceType, lat: p.lat, lng: p.lng, verified: p.verified,
+    events: [...(eventsBy.get(p.id)?.values() ?? [])].sort((a, b) => (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0)),
+  }))
+}

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useFmt, useTimeline } from './Providers'
 import { Icon } from './icons'
 import { useReader } from '@/lib/store'
-import { hijriLabel, gregLabel, ageLabel } from '@/lib/i18n'
+import { dateFacts } from '@/lib/i18n'
 
 /** Slug of the event in the current URL (events/<slug> or preview/<slug>), if any. */
 export function useCurrentSlug(): string | null {
@@ -64,9 +64,7 @@ export function TimelineList() {
                         {isCur ? <span className="now">{f.t('timeline.nowReading')}</span> : null}
                         <span className="ti">{ev.title}</span>
                         <span className="m">
-                          <span>{hijriLabel(f, ev.hijriYear)}</span><span aria-hidden="true">·</span>
-                          <span>{gregLabel(f, ev.gregorianApprox)}</span><span aria-hidden="true">·</span>
-                          <span>{ageLabel(f, ev.prophetAge, ev.hijriYear, true)}</span>
+                          {dateFacts(f, ev.hijriYear, ev.gregorianApprox, ev.prophetAge, true).flatMap((t, i) => [...(i ? [<span key={`d${i}`} aria-hidden="true">·</span>] : []), <span key={i}>{t}</span>])}
                         </span>
                         {ev.place ? <span className="pl"><Icon d="pin" size={13} sw={2} />{ev.place}</span> : null}
                       </span>

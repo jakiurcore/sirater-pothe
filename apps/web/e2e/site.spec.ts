@@ -62,6 +62,8 @@ test.describe('reading flow', () => {
 
   test('home "continue" resumes the last event opened', async ({ page }) => {
     await page.goto('/bn/events/battle-of-badr')
+    // the "last opened" mark is written by an effect after hydration: wait for it, or the next navigation races it
+    await page.waitForFunction(() => !!JSON.parse(localStorage.getItem('seerah:v1:reader') || '{}').last)
     await page.goto('/bn')
     await expect(page.locator('.cont h2')).toHaveText('বদরের যুদ্ধ')
     await page.locator('.cont .btn').click()
