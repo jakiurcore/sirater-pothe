@@ -81,6 +81,9 @@ export const AyahRefSchema = z
     if (!c.ok) ctx.addIssue({ code: 'custom', message: c.error })
   })
 
+import { hasNumber, isPlaceholder, locatorProblem, type CitationLocator } from './locator'
+export { hasNumber, isPlaceholder, locatorProblem, pageProblem, sectionProblem, type CitationLocator } from './locator'
+
 // ───────────── hadith / sources ─────────────
 export const HadithRefSchema = z.strictObject({
   collection: z.string().trim().min(2).max(80).refine((v) => !isPlaceholder(v), 'collection looks like a placeholder: ask the owner which collection'),
@@ -96,52 +99,6 @@ export const SourceSchema = z.object({
   author: z.string().trim().min(2).max(200),
   edition: z.string().trim().max(200).nullish(),
 })
-
-/** Values people (and AIs) type when they do not actually know the locator. Never accepted. */
-const PLACEHOLDERS = new Set(['n/a', 'na', 'none', 'null', 'nil', 'tbd', 'tba', 'todo', 'unknown', 'unk', 'pending', 'later', 'xx', 'xxx', 'page', 'pages', 'p', 'pp', 'vol', 'volume', 'number', 'no', 'num', 'section', 'chapter', 'title', 'placeholder', 'example', 'test', 'asdf', 'foo', 'bar', 'অজানা', 'পরে', 'নেই', 'অজ্ঞাত', 'প্রযোজ্য নয়', 'غير معروف', 'لاحقا'])
-export function isPlaceholder(v: string | null | undefined): boolean {
-  const t = (v ?? '').trim().toLowerCase().replace(/[.\s]+$/g, '')
-  if (!t) return true
-  if (PLACEHOLDERS.has(t)) return true
-  if (!/[\p{L}\p{N}]/u.test(t)) return true // only punctuation: "?", "-", "..."
-  if (/^(.)\1{1,}$/u.test(t)) return true // "xxx", "???", "000"
-  if (/^[0০٠]+$/u.test(t)) return true // page 0 does not exist
-  if (/^(n\/?a|tbd|todo|\?+|-+|\.+)$/i.test(t)) return true
-  return false
-}
-const hasNumber = (v: string) => /\p{Nd}/u.test(v)
-const ROMAN = /^[ivxlcdm]+$/i
-
-/** A page locator is a number (Latin, Bangla or Arabic-Indic digits), a range / list of them, or a roman numeral (prefaces): "98", "১২৩–১২৫", "34, 36", "xii". */
-export function pageProblem(page: string | null | undefined): string | null {
-  const v = (page ?? '').trim()
-  if (!v) return 'page is empty'
-  if (isPlaceholder(v)) return `page "${v}" is a placeholder`
-  const parts = v.split(/\s*[-–—,،;]\s*|\s+/).filter(Boolean)
-  if (!parts.length || !parts.every((x) => /^\p{Nd}+[a-z]?$/iu.test(x) || ROMAN.test(x))) return `page "${v}" is not a page number or range (e.g. 98, 98-101, xii)`
-  if (parts.every((x) => /^[0০٠]+$/u.test(x))) return `page "${v}" does not exist`
-  return null
-}
-export function sectionProblem(section: string | null | undefined): string | null {
-  const v = (section ?? '').trim()
-  if (!v) return 'section/chapter title is empty'
-  if (isPlaceholder(v)) return `section "${v}" is a placeholder`
-  if (v.length < 4 || !/\p{L}/u.test(v)) return `section "${v}" is too short to be a real chapter or section title`
-  return null
-}
-export interface CitationLocator { volume?: string | null; page?: string | null; section?: string | null }
-/**
- * A citation needs ONE of: volume + page, page, or a chapter/section title. A volume alone is not a locator.
- * Returns the reason it is not a valid locator, or null.
- */
-export function locatorProblem(c: CitationLocator): string | null {
-  const hasPage = !!c.page?.trim(), hasSection = !!c.section?.trim()
-  if (c.volume?.trim() && isPlaceholder(c.volume)) return `volume "${c.volume}" is a placeholder`
-  if (hasPage) { const p = pageProblem(c.page); if (p) return p }
-  if (hasSection) { const p = sectionProblem(c.section); if (p) return p }
-  if (!hasPage && !hasSection) return 'no locator: give page (optionally with volume), or a chapter/section title. Ask the owner; never guess.'
-  return null
-}
 
 export const CitationSchema = z.object({
   event_slug: SlugSchema,
@@ -277,27 +234,47 @@ export const CreateApiTokenSchema = z.object({
 // ───────────── publish gate ─────────────
 export interface PublishCandidate {
   certainty: 'agreed' | 'disputed' | null
-  /** Citations as stored; each must carry a valid locator. */
-  citations: CitationLocator[]
-  /** Hadith references on the event (collection + number); one valid reference also satisfies the "at least one source" rule. */
-  hadith?: { collection: string; number: string }[]
+  /** Book citations as stored; `id` is shown in messages so an AI can name the one to fix. */
+  citations: (CitationLocator & { id?: string })[]
+  /** Hadith references on the event (collection + number). */
+  hadith?: { id?: string; collection: string; number: string }[]
+  /** Attached ayat (server-verified surah:ayah). One is enough as a source. */
+  ayahCount?: number
   translations: { lang: string; title?: string | null; summary?: string | null; dispute_note?: string | null }[]
   defaultLang?: string
   /** Places linked to the event with role "primary". Exactly one is required. */
   primaryPlaceCount: number
 }
 
+const locatorText = (c: CitationLocator) => [c.volume ? `volume "${c.volume}"` : '', c.page ? `page "${c.page}"` : '', c.section ? `section "${c.section}"` : ''].filter(Boolean).join(', ') || 'no locator'
+const hadithBad = (h: { collection: string; number: string }) => isPlaceholder(h.collection) || !hasNumber(h.number) || isPlaceholder(h.number)
+
+/** One line per invalid stored citation / hadith reference, naming it and the tool that fixes it. */
+function invalidSources(c: PublishCandidate): string[] {
+  const out: string[] = []
+  c.citations.forEach((x, i) => {
+    const p = locatorProblem(x)
+    if (p) out.push(`Citation ${x.id ? `id ${x.id}` : `#${i + 1}`} (${locatorText(x)}) is invalid: ${p}. Fix it with update_source_citation (citation_id${x.id ? ` "${x.id}"` : ''}) using the real locator from the owner, or remove it with remove_source_citation. Never guess.`)
+  })
+  for (const h of c.hadith ?? []) if (hadithBad(h)) out.push(`Hadith reference ${h.id ? `id ${h.id} ` : ''}(${h.collection} ${h.number}) is invalid: empty or placeholder collection/number. Remove it with detach_hadith_ref${h.id ? ` (hadith_ref_id "${h.id}")` : ''} and attach the real one with attach_hadith_ref. Never guess.`)
+  return out
+}
+const validSources = (c: PublishCandidate) =>
+  c.citations.filter((x) => !locatorProblem(x)).length + (c.hadith ?? []).filter((h) => !hadithBad(h)).length + (c.ayahCount ?? 0)
+
+/** Problems that do not stop publishing but should be fixed: invalid stored citations / hadith refs next to a valid source. */
+export function publishWarnings(c: PublishCandidate): string[] {
+  return validSources(c) > 0 ? invalidSources(c) : []
+}
+
 /** Returns a list of problems that block publishing; empty means publishable. */
 export function publishBlockers(c: PublishCandidate): string[] {
   const out: string[] = []
   const lang = c.defaultLang ?? DEFAULT_LANG
-  const badCites = c.citations.map((x, i) => ({ i, p: locatorProblem(x) })).filter((x) => x.p)
-  for (const b of badCites) out.push(`Citation #${b.i + 1} has no valid locator (${b.p}). Ask the owner for the real page or section; do not guess.`)
-  const goodHadith = (c.hadith ?? []).filter((h) => !isPlaceholder(h.collection) && hasNumber(h.number) && !isPlaceholder(h.number))
-  const badHadith = (c.hadith ?? []).length - goodHadith.length
-  if (badHadith > 0) out.push(`${badHadith} hadith reference(s) have an empty or placeholder collection/number. Ask the owner for the real ones.`)
-  if (c.citations.length - badCites.length + goodHadith.length < 1)
-    out.push('At least one source is required: a book citation with a locator (volume+page, page, or chapter/section title; use list_sources, then add_source_citation) or a hadith reference (attach_hadith_ref: collection + number). Ask the owner for the locator.')
+  if (validSources(c) < 1) {
+    out.push('At least one source is required: a book citation with a locator (volume+page, page, or chapter/section title; use list_sources, then add_source_citation), a hadith reference (attach_hadith_ref: collection + number), or an attached Qur\'an ayah (attach_ayah). Ask the owner for the locator; never guess.')
+    out.push(...invalidSources(c))
+  }
   if (!c.certainty) out.push('Certainty flag is not set. Use set_certainty (agreed | disputed).')
   const t = c.translations.find((x) => x.lang === lang)
   if (!t || !t.title || !t.summary) out.push(`A "${lang}" translation with title and summary is required before publishing.`)

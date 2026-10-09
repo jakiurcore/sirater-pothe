@@ -20,7 +20,7 @@ Conventions
 - Ayat and pictures share ONE placement model (slots: hero, in_summary after paragraph N, after_summary, in_key_details after N, in_lessons after N, before_lessons, end, gallery for pictures only). Call get_event_layout before placing anything. A picture's or ayah's position is its structured placement; never write image markers or URLs into text fields.
 - Writes return a revision_id. revert_revision undoes it.
 - Editors can create and edit drafts; only the owner publishes, unpublishes and verifies places.
-- A publishable event has: a source (a citation with a locator, or a hadith reference), a certainty flag (disputed ⇒ dispute_note), a default-language title and summary.
+- A publishable event has: a source (a citation with a locator, a hadith reference, or an attached ayah), a certainty flag (disputed ⇒ dispute_note), a default-language title and summary.
 `
 
 export function registerResources(server: McpServer, ctx: ToolCtx) {
@@ -50,7 +50,7 @@ Do these steps in order, and stop to ask me whenever something is missing or unc
 
 1. DUPLICATES: call search_events and get_timeline_outline with the key names/terms. If a similar event exists, show it and ask whether to update it instead.
 2. STRUCTURE: restructure my notes into a Bangla title, a short summary, key_details and lessons, plus hijri year, approximate Gregorian year and the Prophet's ﷺ age if I gave them. Show it to me and fix what I correct. Decide era and where it belongs in the order; if the date is uncertain, propose certainty "disputed" with a dispute_note.
-3. SOURCE: call list_sources first. If my book is registered, ask me ONLY for the locator (volume+page, page, or chapter/section title; for a hadith: collection + number) and wait. Never guess a page or hadith number. If I don't have it, say the event cannot be published without it, but you may still create the draft.
+3. SOURCE: call list_sources first. If my book is registered, ask me ONLY for the locator (volume+page, page, or chapter/section title; for a hadith: collection + number) and wait. Valid sources are a book citation (volume+page, page, or section title), a hadith reference, or a server-attached ayah. Never guess a page or hadith number. If publish_event fails, read the error, fix it with the tool it names (update_source_citation / remove_source_citation / detach_hadith_ref) and ask me for any missing locator. Never call delete_draft unless I explicitly ask to delete that specific event. If I don't have it, say the event cannot be published without it, but you may still create the draft.
 4. AYAT: suggest relevant surah:ayah REFERENCES only (never write Arabic). Call attach_ayah for each reference I accept, then show me the Arabic and Bangla the server returned and ask me to confirm each; detach_ayah any I reject. Ask me for hadith collection/number/grading if I want hadith.
 5. PLACE: use find_place; if missing use create_place (type region|city|site, lat then lng, parent_place_slug for a site's city). Be specific: the Zamzam well is a site, not just "Makkah". Call set_primary_place for the ONE primary place, add_event_place for related places. For a journey, create_route (GeoJSON [lng, lat]) and attach it with update_event.
 6. DRAFT: call create_event_draft, then create_source/add_source_citation, set_event_order, add_recall_questions (3 questions from facts stated in the event).

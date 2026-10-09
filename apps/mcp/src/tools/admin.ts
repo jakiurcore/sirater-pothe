@@ -4,7 +4,8 @@ import type { McpServer } from '@modelcontextprotocol/server'
 import { schema as s } from '@seerah/db'
 import { CreateApiTokenSchema, SlugSchema } from '@seerah/content'
 import { defineTool, type ToolCtx } from './kit'
-import { loadSnapshot, restoreStatements, eventBySlug, type Entity } from '../data'
+import { loadSnapshot, restoreEventStatements, restoreStatements, eventBySlug, type Entity } from '../data'
+import { RESTORE_DAYS } from '../purge'
 import { TOKEN_PREFIX } from '../auth/tokens'
 import { ToolError, nowIso, randomToken, sha256Hex, uuid } from '../util'
 
@@ -66,6 +67,18 @@ export function registerAdminTools(server: McpServer, ctx: ToolCtx) {
       ])
       await dropFiles((current.media ?? []).map((m: any) => m.media.r2Key))
       return { ok: true, reverted: rev.id, result: 'deleted draft event', revision_id: newRev }
+    }
+    if (!current && entity === 'event' && rev.action === 'delete_draft' && before) {
+      // Restore a deleted draft (delete_draft): owner only, within RESTORE_DAYS, if its slug is still free.
+      if (actor.role !== 'owner') throw new ToolError('Only the owner can restore a deleted draft.')
+      if (Date.now() - Date.parse(rev.createdAt) > RESTORE_DAYS * 86_400_000) throw new ToolError(`This draft was deleted more than ${RESTORE_DAYS} days ago and has been purged.`)
+      if (await db.query.events.findFirst({ where: eq(s.events.slug, before.event.slug) })) throw new ToolError(`An event with the slug "${before.event.slug}" exists now; rename or remove it first.`)
+      await db.batch([
+        db.insert(s.revisions).values({ id: newRev, entity, entityId: rev.entityId, action: 'revert', beforeJson: null, afterJson: before, actor: actor.login }),
+        db.update(s.revisions).set({ revertedBy: actor.login }).where(eq(s.revisions.id, rev.id)),
+        ...restoreEventStatements(db, before, true),
+      ] as never)
+      return { ok: true, reverted: rev.id, result: `restored draft "${before.event.slug}" with its text, sources, ayat, places, questions and ${before.media?.length ?? 0} picture(s)`, revision_id: newRev }
     }
     if (!current) throw new ToolError('That item no longer exists, so there is nothing to restore into.')
     await db.batch([

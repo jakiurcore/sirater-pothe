@@ -75,17 +75,21 @@ describe('publish gate', () => {
     for (const number of ['tbd', 'n/a', '?', '0', 'number'])
       expect((await call(owner, 'attach_hadith_ref', { event_slug: 'gate-hbad', collection: 'Sahih al-Bukhari', number, grading: 'Sahih' })).isError, number).toBe(true)
   })
-  it('a legacy / placeholder locator already in the database still blocks publishing (and does not count as the source)', async () => {
+  it('a legacy / placeholder locator in the database blocks only when it is the sole source; next to a valid one it is a warning', async () => {
     await ready('gate-legacy')
     const ev = (await db().select().from(s.events).where(eq(s.events.slug, 'gate-legacy')))[0]!
     const src = (await db().select().from(s.sources).where(eq(s.sources.slug, 'rahiq')))[0]!
-    await db().insert(s.eventSources).values({ id: 'legacy-1', eventId: ev.id, sourceId: src.id, page: '(dev placeholder)' })
-    expect(await blockers('gate-legacy')).toMatch(/Citation #1 has no valid locator/)
+    await db().insert(s.eventSources).values({ id: 'legacy-1-bad-citation', eventId: ev.id, sourceId: src.id, page: '(dev placeholder)' })
+    expect(await blockers('gate-legacy')).toMatch(/Citation id legacy-1-bad-citation[^|]*is invalid[^|]*update_source_citation/)
     expect((await call(owner, 'publish_event', { slug: 'gate-legacy' })).isError).toBe(true)
-    await db().insert(s.eventSources).values({ id: 'legacy-2', eventId: ev.id, sourceId: src.id, page: '12' })
-    expect(await blockers('gate-legacy')).toMatch(/Citation #1/) // the bad one still blocks next to a good one
-    await db().delete(s.eventSources).where(eq(s.eventSources.id, 'legacy-1'))
-    expect((await call(owner, 'publish_event', { slug: 'gate-legacy' })).isError).toBe(false)
+    await db().insert(s.eventSources).values({ id: 'legacy-2-good-citation', eventId: ev.id, sourceId: src.id, page: '12' })
+    expect(await blockers('gate-legacy')).toBe('')
+    const g = (await call(owner, 'get_event', { slug: 'gate-legacy' })).json
+    expect(g.publish_warnings.join(' ')).toMatch(/legacy-1-bad-citation/)
+    expect(g.sources.map((x: any) => [x.citation_id, x.valid])).toEqual(expect.arrayContaining([['legacy-1-bad-citation', false], ['legacy-2-good-citation', true]]))
+    const p = await call(owner, 'publish_event', { slug: 'gate-legacy' })
+    expect(p.isError).toBe(false)
+    expect(p.json.warnings.join(' ')).toMatch(/legacy-1-bad-citation/)
   })
 })
 

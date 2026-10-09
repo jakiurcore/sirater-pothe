@@ -199,6 +199,23 @@ async function sourcesGate(token: string) {
       const sec = await tool(token, 'add_source_citation', { event_slug: SLUG4, source_slug: book, section: 'পরীক্ষামূলক অধ্যায়ের শিরোনাম' })
       ok(!sec.isError, 'a chapter/section title is a valid locator', sec.isError ? sec.text : '')
     } else console.log('SKIP  no registered book to cite')
+    const h0 = (await tool(token, 'get_event', { slug: SLUG4 })).json
+    const cid = h0?.sources?.[0]?.citation_id as string | undefined
+    if (cid) {
+      ok(h0.sources[0].valid === true, 'get_event shows citation_id and valid flag')
+      ok((await tool(token, 'update_source_citation', { event_slug: SLUG4, citation_id: cid, page: 'tbd', section: null })).isError, 'update_source_citation refuses a placeholder')
+      ok(!(await tool(token, 'update_source_citation', { event_slug: SLUG4, citation_id: cid, page: '12' })).isError, 'update_source_citation sets a real page')
+      ok(!(await tool(token, 'remove_source_citation', { event_slug: SLUG4, citation_id: cid })).isError, 'remove_source_citation removes it')
+      await tool(token, 'attach_ayah', { event_slug: SLUG4, surah: 96, ayah: 1 })
+      ok(!((await tool(token, 'get_event', { slug: SLUG4 })).json?.publish_blockers as string[]).some((b) => /source/i.test(b)), 'an attached ayah alone satisfies the source rule')
+    }
+    const wrong = await tool(token, 'delete_draft', { event_slug: SLUG4, confirm_slug: SLUG4 + 'x' })
+    ok(wrong.isError && /does not match/.test(wrong.text), 'delete_draft with a wrong confirm_slug is refused')
+    const dd = await tool(token, 'delete_draft', { event_slug: SLUG4, confirm_slug: SLUG4 })
+    ok(!dd.isError, 'delete_draft (exact slug) soft-deletes the draft', dd.isError ? dd.text : '')
+    ok((await tool(token, 'get_event', { slug: SLUG4 })).isError, 'the draft is gone from get_event')
+    ok((await tool(token, 'list_drafts', {})).json?.recently_deleted?.some((x: { slug: string }) => x.slug === SLUG4), 'list_drafts lists it as recently deleted')
+    ok(!(await tool(token, 'revert_revision', { revision_id: dd.json.revision_id })).isError, 'revert_revision restores it')
     const h = await tool(token, 'get_event', { slug: SLUG4 })
     ok(!(h.json?.publish_blockers as string[] | undefined)?.some((b) => /source/i.test(b)) || !book, 'the section citation satisfies the source rule', JSON.stringify(h.json?.publish_blockers))
     const rv = await tool(token, 'list_revisions', { event_slug: SLUG4 })
@@ -347,8 +364,8 @@ async function main() {
 
   const list = await rpc(token, 'tools/list')
   const names: string[] = list.body.result?.tools?.map((t: { name: string }) => t.name) ?? []
-  ok(names.length === 43, `tools/list returns all 43 tools`, `(${names.length})`)
-  for (const t of ['set_primary_place', 'add_event_place', 'remove_event_place', 'set_media_placement', 'attach_media', 'update_place', 'get_event_layout', 'set_ayah_placement', 'create_upload_url', 'create_upload_link', 'upload_media_begin', 'upload_media_chunk', 'upload_media_finish', 'list_sources']) ok(names.includes(t), `tool ${t} is listed`)
+  ok(names.length === 47, `tools/list returns all 47 tools`, `(${names.length})`)
+  for (const t of ['set_primary_place', 'add_event_place', 'remove_event_place', 'set_media_placement', 'attach_media', 'update_place', 'get_event_layout', 'set_ayah_placement', 'create_upload_url', 'create_upload_link', 'upload_media_begin', 'upload_media_chunk', 'upload_media_finish', 'list_sources', 'remove_source_citation', 'update_source_citation', 'detach_hadith_ref', 'delete_draft']) ok(names.includes(t), `tool ${t} is listed`)
 
   const eras = await tool(token, 'list_eras', {})
   ok(!eras.isError && eras.text.includes('prophethood-in-makkah'), 'list_eras sees the production seed (5 eras)')

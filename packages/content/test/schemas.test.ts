@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   AyahRefSchema, HadithRefSchema, UploadMediaSchema, CreateRouteSchema, CreatePlaceSchema, CreateEventDraftSchema,
-  RecallQuestionSchema, CitationSchema, publishBlockers, placementProblem, placementNeedsReview, summaryParagraphs, slotCounts, slotSort, PLACEMENTS, ALLOWED_MEDIA_MIME, MAX_MEDIA_BYTES, placeZoom, effectiveZoom, maxZoomAt, DEFAULT_ZOOM, PlaceTypeSchema, addHonorific, missingHonorific, HijriYearSchema, GAZETTEER_SEED, inArabiaBBox,
+  RecallQuestionSchema, CitationSchema, publishBlockers, publishWarnings, placementProblem, placementNeedsReview, summaryParagraphs, slotCounts, slotSort, PLACEMENTS, ALLOWED_MEDIA_MIME, MAX_MEDIA_BYTES, placeZoom, effectiveZoom, maxZoomAt, DEFAULT_ZOOM, PlaceTypeSchema, addHonorific, missingHonorific, HijriYearSchema, GAZETTEER_SEED, inArabiaBBox,
 } from '../src'
 
 const msgs = (r: { success: boolean; error?: { issues: { message: string }[] } }) => r.error?.issues.map((i) => i.message).join(' | ') ?? ''
@@ -154,23 +154,36 @@ describe('publishBlockers', () => {
     expect(publishBlockers({ ...ok, citations: [], hadith: [{ collection: 'Sahih al-Bukhari', number: '3' }] })).toEqual([])
     expect(publishBlockers({ ...ok, citations: [{ section: 'কিতাবুল ওহী' }] })).toEqual([])
   })
-  it('a stored citation without a valid locator blocks publishing, even next to a good one', () => {
-    const b = publishBlockers({ ...ok, citations: [{ page: '98' }, { page: 'tbd' }] })
-    expect(b).toHaveLength(1); expect(b[0]).toMatch(/Citation #2.*placeholder/)
-    expect(publishBlockers({ ...ok, citations: [{ volume: '1' }] }).join(' ')).toMatch(/no locator/)
-    expect(publishBlockers({ ...ok, citations: [{ page: null }] }).length).toBeGreaterThan(0)
+  it('an ayah alone satisfies the source rule', () => {
+    expect(publishBlockers({ ...ok, citations: [], ayahCount: 1 })).toEqual([])
+    expect(publishBlockers({ ...ok, citations: [], ayahCount: 0 })[0]).toMatch(/At least one source/)
   })
-  it('placeholder hadith references block and do not count as a source', () => {
-    const b = publishBlockers({ ...ok, citations: [], hadith: [{ collection: 'Bukhari', number: 'tbd' }] })
-    expect(b.join(' ')).toMatch(/hadith reference/); expect(b.join(' ')).toMatch(/At least one source/)
+  it('the gate passes with any one of: valid citation, valid hadith, ayah', () => {
+    for (const o of [{ citations: [{ page: '9' }] }, { citations: [], hadith: [{ collection: 'Bukhari', number: '3364' }] }, { citations: [], ayahCount: 2 }])
+      expect(publishBlockers({ ...ok, ...o })).toEqual([])
   })
-  it('requires certainty', () => expect(publishBlockers({ ...ok, certainty: null })[0]).toMatch(/Certainty/))
-  it('requires default-lang translation', () => expect(publishBlockers({ ...ok, translations: [] })[0]).toMatch(/"bn" translation/))
-  it('requires exactly one primary place', () => {
-    expect(publishBlockers({ ...ok, primaryPlaceCount: 0 })[0]).toMatch(/No primary place/)
-    expect(publishBlockers({ ...ok, primaryPlaceCount: 2 })[0]).toMatch(/2 primary places/)
+  it('an invalid stored citation next to another valid source is only a warning, naming the citation and the fixing tools', () => {
+    const c = { ...ok, citations: [{ id: 'c-good', page: '98' }, { id: 'c-bad-0001', page: 'hadith no. 3364' }] }
+    expect(publishBlockers(c)).toEqual([])
+    const w = publishWarnings(c)
+    expect(w).toHaveLength(1)
+    expect(w[0]).toMatch(/c-bad-0001/); expect(w[0]).toMatch(/update_source_citation/); expect(w[0]).toMatch(/remove_source_citation/)
+    expect(publishWarnings({ ...ok, citations: [{ id: 'x', page: 'tbd' }], ayahCount: 1 })).toHaveLength(1) // an ayah also makes it a warning
+    expect(publishWarnings({ ...ok })).toEqual([])
   })
-  it('disputed requires note', () => expect(publishBlockers({ ...ok, certainty: 'disputed' })[0]).toMatch(/dispute_note/))
+  it('an invalid citation as the ONLY source blocks, and says which one and which tool fixes it', () => {
+    const b = publishBlockers({ ...ok, citations: [{ id: 'c-bad-0001', volume: '1' }] })
+    expect(b[0]).toMatch(/At least one source/)
+    expect(b.join(' ')).toMatch(/Citation id c-bad-0001 \(volume "1"\) is invalid: no locator/)
+    expect(b.join(' ')).toMatch(/update_source_citation|remove_source_citation/)
+    expect(publishWarnings({ ...ok, citations: [{ id: 'c-bad-0001', volume: '1' }] })).toEqual([]) // not duplicated as a warning
+  })
+  it('placeholder hadith references block (as the only source) and point to detach_hadith_ref; next to a valid source they warn', () => {
+    const only = publishBlockers({ ...ok, citations: [], hadith: [{ id: 'h-1-bad-0001', collection: 'Bukhari', number: 'tbd' }] })
+    expect(only.join(' ')).toMatch(/At least one source/); expect(only.join(' ')).toMatch(/detach_hadith_ref/)
+    const next = { ...ok, hadith: [{ id: 'h-1-bad-0001', collection: 'Bukhari', number: 'tbd' }] }
+    expect(publishBlockers(next)).toEqual([]); expect(publishWarnings(next)[0]).toMatch(/detach_hadith_ref/)
+  })
 })
 
 describe('place types and zoom', () => {

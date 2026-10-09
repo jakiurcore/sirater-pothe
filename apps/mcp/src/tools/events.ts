@@ -7,7 +7,8 @@ import {
   UpdateEventTranslationSchema, DEFAULT_LANG, addHonorific,
 } from '@seerah/content'
 import { assertCanEdit, defineTool, type ToolCtx } from './kit'
-import { blockersFor, placementReview, eraBySlug, eventBySlug, linksOf, loadEventAggregate, maxOrder, placeBySlug, placeLinkStatements, planRemovePlace, planSetPrimary, routeBySlug, touch, withRevision, titles } from '../data'
+import { blockersFor, warningsFor, placementReview, eraBySlug, eventBySlug, linksOf, loadEventAggregate, maxOrder, placeBySlug, placeLinkStatements, planRemovePlace, planSetPrimary, routeBySlug, touch, withRevision, titles } from '../data'
+import { RESTORE_DAYS } from '../purge'
 import { ToolError, nowIso, randomToken, sha256Hex, uuid } from '../util'
 
 const GAP = 1024
@@ -233,11 +234,11 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
         ...langs.map((l) => db.update(s.eventTranslations).set({ status: 'published' }).where(and(eq(s.eventTranslations.eventId, ev.id), eq(s.eventTranslations.lang, l)))),
       ],
     })
-    return { ok: true, slug, status: 'published', published_langs: langs, revision_id: revisionId, url: `${env.WEB_ORIGIN.replace(/\/$/, '')}/${DEFAULT_LANG}/events/${slug}` }
+    return { ok: true, slug, status: 'published', published_langs: langs, warnings: warningsFor(agg), revision_id: revisionId, url: `${env.WEB_ORIGIN.replace(/\/$/, '')}/${DEFAULT_LANG}/events/${slug}` }
   })
 
   defineTool(server, ctx, 'unpublish_event', {
-    title: 'Unpublish event', description: 'Take a published event offline (back to draft). Content is kept.', access: 'owner',
+    title: 'Unpublish event', description: 'Take a published event offline (back to draft). Content is kept. (To delete an event that was never published, the owner uses delete_draft.)', access: 'owner',
     input: z.object({ slug: SlugSchema }),
   }, async ({ slug }) => {
     const ev = await eventBySlug(db, slug)
@@ -247,5 +248,27 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
       build: () => [db.update(s.events).set({ status: 'draft', updatedAt: nowIso() }).where(eq(s.events.id, ev.id))],
     })
     return { ok: true, slug, status: 'draft', revision_id: revisionId }
+  })
+
+  defineTool(server, ctx, 'delete_draft', {
+    title: 'Delete draft',
+    description: 'Delete a draft event that has NEVER been published. Owner only; use ONLY when the owner explicitly asks to delete that specific event. confirm_slug must exactly equal the slug. A published event cannot be deleted this way: use unpublish_event. It is a soft delete: a full snapshot is kept and revert_revision restores it for 30 days (pictures included); after that a nightly job purges it for good.',
+    access: 'owner', destructive: true,
+    input: z.object({ event_slug: SlugSchema, confirm_slug: z.string().max(120).describe('Must be exactly the same as event_slug (typed again on purpose).') }),
+  }, async ({ event_slug, confirm_slug }) => {
+    if (confirm_slug !== event_slug) throw new ToolError(`confirm_slug "${confirm_slug}" does not match "${event_slug}". Nothing was deleted. Repeat the slug exactly, and only if the owner asked to delete this event.`)
+    const ev = await eventBySlug(db, event_slug)
+    if (ev.status === 'published') throw new ToolError(`"${event_slug}" is published. delete_draft never deletes published content: use unpublish_event first (owner), then decide.`)
+    const published = ev.publishedAt || await db.query.revisions.findFirst({ where: and(eq(s.revisions.entity, 'event'), eq(s.revisions.entityId, ev.id), eq(s.revisions.action, 'publish')) })
+    if (published) throw new ToolError(`"${event_slug}" was published before and is now a draft again. delete_draft only removes drafts that never went live. Nothing was deleted; ask the owner how to proceed.`)
+    const { revisionId } = await withRevision(db, actor, {
+      entity: 'event', entityId: ev.id, action: 'delete_draft',
+      build: () => [
+        db.delete(s.media).where(eq(s.media.eventId, ev.id)), // media rows only; the files stay in R2 until the purge so the draft can be restored
+        db.delete(s.events).where(eq(s.events.id, ev.id)),
+      ],
+    })
+    const until = new Date(Date.now() + RESTORE_DAYS * 86_400_000).toISOString()
+    return { ok: true, deleted: event_slug, revision_id: revisionId, restorable_until: until, restore_with: `revert_revision(revision_id: "${revisionId}") (owner)` }
   })
 }

@@ -5,6 +5,7 @@ import { resolveActor } from './access'
 import { resolveApiToken } from './auth/tokens'
 import { defaultHandler } from './auth/login'
 import { buildServer } from './server'
+import { purgeDeleted } from './purge'
 
 const apiHandler = {
   async fetch(request: Request, env: Env, rawCtx: ExecutionContext): Promise<Response> {
@@ -44,6 +45,10 @@ export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext) {
     provider ??= build(env)
     return provider.fetch(request, env, ctx)
+  },
+  /** Nightly (see wrangler `triggers.crons`): purge deleted drafts after 30 days, expired tokens and orphaned pictures. */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(purgeDeleted(env).then((r) => console.log(JSON.stringify({ purge: r }))))
   },
 } satisfies ExportedHandler<Env>
 

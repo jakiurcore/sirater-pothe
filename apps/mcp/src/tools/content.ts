@@ -3,7 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { McpServer } from '@modelcontextprotocol/server'
 import { schema as s } from '@seerah/db'
 import {
-  ARABIC_DATASET, AyahPlacementFields, addHonorific, CitationSchema, HadithRefSchema, LangSchema, RecallItemSchema, SlugSchema, SourceSchema, DEFAULT_LANG,
+  ARABIC_DATASET, AyahPlacementFields, addHonorific, CitationSchema, HadithRefSchema, LangSchema, locatorProblem, RecallItemSchema, SlugSchema, SourceSchema, DEFAULT_LANG,
   checkRef, formatRef, getAyat, getTranslationMeta, availableTranslationLangs,
 } from '@seerah/content'
 import { assertCanEdit, defineTool, type ToolCtx } from './kit'
@@ -215,6 +215,72 @@ export function registerContentTools(server: McpServer, ctx: ToolCtx) {
       build: () => [db.insert(s.eventSources).values({ id, eventId: ev.id, sourceId: src.id, volume, page, section, note: a.note ?? null }), touch(db, ev.id)],
     })
     return { ok: true, citation_id: id, event: a.event_slug, source: a.source_slug, revision_id: revisionId }
+  })
+
+  const citationOf = async (eventId: string, citationId: string) => {
+    const c = await db.query.eventSources.findFirst({ where: and(eq(s.eventSources.id, citationId), eq(s.eventSources.eventId, eventId)) })
+    if (!c) throw new ToolError(`No citation "${citationId}" on this event. Use get_event: every citation has a citation_id.`)
+    return c
+  }
+
+  defineTool(server, ctx, 'remove_source_citation', {
+    title: 'Remove source citation',
+    description: 'Remove one citation from an event (use the citation_id from get_event). Typical use: an invalid citation that publish_event or get_event reported. Editors: drafts only; on a published event only the owner. Undo with revert_revision.',
+    access: 'write', destructive: true,
+    input: z.object({ event_slug: SlugSchema, citation_id: z.string().min(8).max(64) }),
+  }, async (a) => {
+    const ev = await eventBySlug(db, a.event_slug)
+    assertCanEdit(ctx, ev.status)
+    const c = await citationOf(ev.id, a.citation_id)
+    const { revisionId } = await withRevision(db, actor, {
+      entity: 'event', entityId: ev.id, action: 'remove_citation',
+      build: () => [db.delete(s.eventSources).where(eq(s.eventSources.id, c.id)), touch(db, ev.id)],
+    })
+    return { ok: true, event: a.event_slug, removed: { citation_id: c.id, volume: c.volume, page: c.page, section: c.section }, revision_id: revisionId }
+  })
+
+  defineTool(server, ctx, 'update_source_citation', {
+    title: 'Update source citation',
+    description: 'Change the volume / page / section of one citation (citation_id from get_event). Fields you leave out stay; null or "" clears one. The result must still be a valid locator (volume+page, page, or section title; no placeholders): take it from the owner, never guess. Editors: drafts only; on a published event only the owner.',
+    access: 'write',
+    input: z.object({
+      event_slug: SlugSchema, citation_id: z.string().min(8).max(64),
+      volume: z.string().trim().max(30).nullish(), page: z.string().trim().max(30).nullish(), section: z.string().trim().max(200).nullish(),
+    }),
+  }, async (a) => {
+    const ev = await eventBySlug(db, a.event_slug)
+    assertCanEdit(ctx, ev.status)
+    const c = await citationOf(ev.id, a.citation_id)
+    const pick = (given: string | null | undefined, old: string | null) => (given === undefined ? old : given?.trim() || null)
+    const next = { volume: pick(a.volume, c.volume), page: pick(a.page, c.page), section: pick(a.section, c.section) }
+    const problem = locatorProblem(next)
+    if (problem) throw new ToolError(`${problem}. Valid locators: volume+page, page, or chapter/section title. Ask the owner; never guess. Nothing was changed.`)
+    const dup = (await db.select().from(s.eventSources).where(and(eq(s.eventSources.eventId, ev.id), eq(s.eventSources.sourceId, c.sourceId))))
+      .find((x) => x.id !== c.id && (x.volume ?? null) === next.volume && (x.page ?? null) === next.page && (x.section ?? null) === next.section)
+    if (dup) throw new ToolError('Another citation of this source on this event already has exactly that locator.')
+    const { revisionId } = await withRevision(db, actor, {
+      entity: 'event', entityId: ev.id, action: 'update_citation',
+      build: () => [db.update(s.eventSources).set(next).where(eq(s.eventSources.id, c.id)), touch(db, ev.id)],
+    })
+    return { ok: true, event: a.event_slug, citation_id: c.id, before: { volume: c.volume, page: c.page, section: c.section }, after: next, revision_id: revisionId }
+  })
+
+  defineTool(server, ctx, 'detach_hadith_ref', {
+    title: 'Detach hadith reference',
+    description: 'Remove a hadith reference from an event (hadith_ref_id from get_event). The reference record itself is kept for other events. Editors: drafts only; on a published event only the owner. Undo with revert_revision.',
+    access: 'write', destructive: true,
+    input: z.object({ event_slug: SlugSchema, hadith_ref_id: z.string().min(8).max(64) }),
+  }, async (a) => {
+    const ev = await eventBySlug(db, a.event_slug)
+    assertCanEdit(ctx, ev.status)
+    const link = await db.query.eventHadith.findFirst({ where: and(eq(s.eventHadith.eventId, ev.id), eq(s.eventHadith.hadithId, a.hadith_ref_id)) })
+    if (!link) throw new ToolError(`No hadith reference "${a.hadith_ref_id}" on this event. Use get_event: every hadith has a hadith_ref_id.`)
+    const ref = await db.query.hadithRefs.findFirst({ where: eq(s.hadithRefs.id, a.hadith_ref_id) })
+    const { revisionId } = await withRevision(db, actor, {
+      entity: 'event', entityId: ev.id, action: 'detach_hadith',
+      build: () => [db.delete(s.eventHadith).where(and(eq(s.eventHadith.eventId, ev.id), eq(s.eventHadith.hadithId, a.hadith_ref_id))), touch(db, ev.id)],
+    })
+    return { ok: true, event: a.event_slug, detached: ref ? `${ref.collection} ${ref.number}` : a.hadith_ref_id, revision_id: revisionId }
   })
 
   defineTool(server, ctx, 'add_recall_questions', {

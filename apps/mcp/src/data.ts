@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import type { Db } from '@seerah/db'
 import { schema as s } from '@seerah/db'
-import { DEFAULT_LANG, publishBlockers, placeZoom, placementNeedsReview, slotCounts, type EventPlaceRole, type PlaceType, type SlotCounts } from '@seerah/content'
+import { DEFAULT_LANG, locatorProblem, publishBlockers, publishWarnings, placeZoom, placementNeedsReview, slotCounts, type EventPlaceRole, type PlaceType, type SlotCounts } from '@seerah/content'
 import { ToolError, nowIso, uuid } from './util'
 import type { Actor } from './env'
 
@@ -93,10 +93,12 @@ export async function loadEventAggregate(db: Db, eventId: string): Promise<Event
 }
 
 /** Statements that make the DB match `snap` for this event (child rows replaced wholesale). */
-export function restoreEventStatements(db: Db, snap: EventAggregate): BatchStmt[] {
+export function restoreEventStatements(db: Db, snap: EventAggregate, recreate = false): BatchStmt[] {
   const id = snap.event.id
   const st: BatchStmt[] = [
-    db.update(s.events).set({ ...snap.event, updatedAt: nowIso() }).where(eq(s.events.id, id)),
+    recreate
+      ? db.insert(s.events).values({ ...snap.event, updatedAt: nowIso() }) // the event was deleted (delete_draft): bring the row back
+      : db.update(s.events).set({ ...snap.event, updatedAt: nowIso() }).where(eq(s.events.id, id)),
     db.delete(s.eventTranslations).where(eq(s.eventTranslations.eventId, id)),
     db.delete(s.eventSources).where(eq(s.eventSources.eventId, id)),
     db.delete(s.eventAyatNotes).where(eq(s.eventAyatNotes.eventId, id)),
@@ -282,15 +284,24 @@ export const countsFor = (agg: Pick<EventAggregate, 'translations'>, lang?: stri
   return slotCounts({ summary: t?.summary, keyDetails: t?.keyDetails, lessons: t?.lessons })
 }
 
+/** What the publish gate needs to know about an event's sources. */
+const sourceCandidate = (agg: EventAggregate) => ({
+  citations: agg.sources.map((c) => ({ id: c.id, volume: c.volume, page: c.page, section: c.section })),
+  hadith: (agg.hadithRefs ?? []).map((h) => ({ id: h.id, collection: h.collection, number: h.number })),
+  ayahCount: agg.ayat.length,
+})
+const candidateOf = (agg: EventAggregate) => ({
+  certainty: agg.event.certainty,
+  ...sourceCandidate(agg),
+  translations: agg.translations.map((t) => ({ lang: t.lang, title: t.title, summary: t.summary, dispute_note: t.disputeNote })),
+  primaryPlaceCount: agg.places.filter((p) => p.role === 'primary').length,
+})
+/** Invalid stored citations / hadith refs that do NOT block publishing (the event has another valid source). */
+export const warningsFor = (agg: EventAggregate): string[] => publishWarnings(candidateOf(agg))
+
 /** The single source of truth for "what blocks publishing this event". */
 export function blockersFor(agg: EventAggregate): string[] {
-  return publishBlockers({
-    certainty: agg.event.certainty,
-    citations: agg.sources.map((c) => ({ volume: c.volume, page: c.page, section: c.section })),
-    hadith: agg.hadithRefs ?? [],
-    translations: agg.translations.map((t) => ({ lang: t.lang, title: t.title, summary: t.summary, dispute_note: t.disputeNote })),
-    primaryPlaceCount: agg.places.filter((p) => p.role === 'primary').length,
-  })
+  return publishBlockers(candidateOf(agg))
 }
 
 export interface ReviewItem { kind: 'ayah' | 'media'; id: string; placement: string; after_index: number; section: string; langs: { lang: string; count: number }[]; fix: string }
@@ -367,7 +378,8 @@ export async function eventView(db: Db, eventId: string, lang?: string) {
     translation_langs: agg.translations.map((x) => ({ lang: x.lang, status: x.status })),
     sources: agg.sources.map((c) => {
       const src = srcRows.find((x) => x.id === c.sourceId)
-      return { citation_id: c.id, source: src?.slug, book: src?.book, author: src?.author, edition: src?.edition, volume: c.volume, page: c.page, section: c.section, note: c.note }
+      const problem = locatorProblem(c)
+      return { citation_id: c.id, valid: !problem, problem: problem ?? undefined, source: src?.slug, book: src?.book, author: src?.author, edition: src?.edition, volume: c.volume, page: c.page, section: c.section, note: c.note }
     }),
     ayat: agg.ayat.map((a) => ({
       ...(ayah.get(a.ayahId) as object),
@@ -375,7 +387,7 @@ export async function eventView(db: Db, eventId: string, lang?: string) {
       placement_note: Object.fromEntries(agg.ayatNotes.filter((n) => n.ayahId === a.ayahId).map((n) => [n.lang, n.note])),
     })),
     needs_placement_review: placementReview(agg),
-    hadith: agg.hadith.map((h) => hadithRows.find((x) => x.id === h.hadithId)).filter(Boolean).map((h) => ({ collection: h!.collection, number: h!.number, grading: h!.grading, grading_by: h!.gradingBy, note: h!.note })),
+    hadith: agg.hadith.map((h) => hadithRows.find((x) => x.id === h.hadithId)).filter(Boolean).map((h) => ({ hadith_ref_id: h!.id, collection: h!.collection, number: h!.number, grading: h!.grading, grading_by: h!.gradingBy, note: h!.note })),
     recall_questions: agg.recall.map((q) => {
       const qt = pickLang(q.translations, l)
       return { id: q.question.id, lang: qt?.lang, question: qt?.question, answer: qt?.answer, distractors: qt?.distractors }

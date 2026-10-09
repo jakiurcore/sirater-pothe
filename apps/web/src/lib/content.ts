@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { schema as s, type Db } from '@seerah/db'
 import { addHonorific } from '@seerah/content/honorific'
+import { hasNumber, isPlaceholder, locatorProblem } from '@seerah/content/locator'
 import { DEFAULT_LANG, type Lang } from '@seerah/content/langs'
 import { effectiveZoom, type EventPlaceRole, type PlaceType } from '@seerah/content/geo'
 import { slotCounts, summaryParagraphs, type Placement, type SlotCounts } from '@seerah/content/placement'
@@ -271,9 +272,10 @@ export async function getEventPage({ slug, lang, preview = false, previewToken }
       const n = note.find((x) => x.lang === lang) ?? note.find((x) => x.lang === DEFAULT_LANG) ?? note[0]
       return a ? { kind: 'ayah' as const, placement: l.placement, afterIndex: l.afterIndex, order: l.orderIndex, note: honN(n?.note), ref: `${a.surah}:${a.ayah}`, surah: a.surah, ayah: a.ayah, arabic: a.arabicText, translation: tr?.text ?? null, translationSource: tr ? datasetName.get(tr.translationSource) ?? tr.translationSource : null, translationLicense: tr?.translationLicense ?? null } as AyahView : null
     }).filter((x): x is AyahView => !!x),
-    hadith: hadithLinks.map((l) => hadithRows.find((x) => x.id === l.hadithId)).filter((x): x is NonNullable<typeof x> => !!x)
+    hadith: hadithLinks.map((l) => hadithRows.find((x) => x.id === l.hadithId)).filter((x): x is NonNullable<typeof x> => !!x && !isPlaceholder(x.collection) && hasNumber(x.number) && !isPlaceholder(x.number))
       .map((h) => ({ collection: h.collection, number: h.number, grading: h.grading, gradingBy: h.gradingBy, note: h.note })),
-    sources: cites.map((c) => {
+    // A citation without a valid locator (legacy / placeholder) is never shown publicly.
+    sources: cites.filter((c) => !locatorProblem(c)).map((c) => {
       const src = srcRows.find((x) => x.id === c.sourceId)
       return { book: src?.book ?? '', author: src?.author ?? '', edition: src?.edition ?? null, volume: c.volume, page: c.page, section: c.section, note: c.note }
     }),

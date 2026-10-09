@@ -1,10 +1,11 @@
 import { z } from 'zod'
-import { and, eq, sql, asc } from 'drizzle-orm'
+import { and, eq, sql, asc, desc, gt, isNull } from 'drizzle-orm'
 import { schema as s } from '@seerah/db'
 import { LangSchema, SlugSchema, StatusSchema, DEFAULT_LANG } from '@seerah/content'
 import { defineTool, type ToolCtx } from './kit'
 import { buildLayout } from '../layout'
-import { blockersFor, eraBySlug, eventBySlug, eventView, loadEventAggregate, titles } from '../data'
+import { RESTORE_DAYS } from '../purge'
+import { blockersFor, warningsFor, eraBySlug, eventBySlug, eventView, loadEventAggregate, titles } from '../data'
 import type { McpServer } from '@modelcontextprotocol/server'
 
 const esc = (q: string) => q.replace(/[\\%_]/g, (c) => '\\' + c)
@@ -72,7 +73,7 @@ export function registerReadTools(server: McpServer, ctx: ToolCtx) {
     const e = await eventBySlug(db, slug)
     const view = await eventView(db, e.id, lang)
     const agg = (await loadEventAggregate(db, e.id))!
-    return { ...view, publish_blockers: blockersFor(agg) }
+    return { ...view, publish_blockers: blockersFor(agg), publish_warnings: warningsFor(agg) }
   })
 
   defineTool(server, ctx, 'get_event_layout', {
@@ -111,9 +112,19 @@ export function registerReadTools(server: McpServer, ctx: ToolCtx) {
       out.push({
         slug: r.slug, title: tt.get(r.id) ?? null, needs_verification: r.needsVerification, updated_at: r.updatedAt,
         blockers: blockersFor(agg),
+        warnings: warningsFor(agg),
       })
     }
-    return { count: out.length, drafts: out }
+    // Deleted drafts stay restorable (revert_revision) for 30 days; they are listed apart from the live ones.
+    const since = new Date(Date.now() - RESTORE_DAYS * 86_400_000).toISOString()
+    const del = await db.select().from(s.revisions).where(and(eq(s.revisions.entity, 'event'), eq(s.revisions.action, 'delete_draft'), isNull(s.revisions.revertedBy), gt(s.revisions.createdAt, since))).orderBy(desc(s.revisions.createdAt))
+    const recently_deleted = del.map((r) => {
+      const snap = r.beforeJson as { event?: { slug: string }; translations?: { lang: string; title: string | null }[] } | null
+      const tr = snap?.translations?.find((t) => t.lang === (lang ?? DEFAULT_LANG)) ?? snap?.translations?.[0]
+      const until = new Date(Date.parse(r.createdAt) + RESTORE_DAYS * 86_400_000).toISOString()
+      return { slug: snap?.event?.slug ?? null, title: tr?.title ?? null, deleted_by: r.actor, deleted_at: r.createdAt, label: `recently deleted (restorable until ${until.slice(0, 10)})`, restorable_until: until, revision_id: r.id, restore_with: 'revert_revision (owner)' }
+    })
+    return { count: out.length, drafts: out, recently_deleted }
   })
 
   defineTool(server, ctx, 'get_timeline_outline', {

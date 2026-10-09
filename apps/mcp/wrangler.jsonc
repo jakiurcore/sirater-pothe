@@ -5,6 +5,8 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "observability": { "enabled": true },
+  // Nightly 03:00 UTC: purge deleted drafts after 30 days (and their pictures), expired tokens, orphaned files.
+  "triggers": { "crons": ["0 3 * * *"] },
   // Routes/custom domains are NOT hardcoded: scripts/render-wrangler.mjs (phase 5) injects
   // mcp.$DOMAIN from the environment. For local dev the worker runs on localhost.
   "vars": {
