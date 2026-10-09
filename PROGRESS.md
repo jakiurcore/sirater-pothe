@@ -155,3 +155,10 @@ Resizing uses Cloudflare's Images binding (`env.IMAGES`); if it is missing or fa
 **MCP context.** New `get_event_layout` (numbered paragraphs / key details / lessons with the first ~80 characters and what is placed after each); guidelines now tell AIs to call it first, pick the slot the item directly supports, explain the choice to the owner before saving, never dump everything in one place, write every field in correct standard Bangla (never Banglish), keep honorifics, and keep `placement_note` to one sentence in the page language; new MCP prompt `place_ayat_and_media`. 42 tools.
 
 **Known limits.** Upload tokens for the link page are created by the tool, so the page is only reachable with a fresh token; the 3D/terrain and other earlier limits are unchanged. `scripts/smoke-live.ts` (needs the owner's login) covers the authenticated paths end to end; `apps/web/scripts/smoke-upload-live.mjs` covers PUT, the page, EXIF stripping and the Images binding without a login.
+
+## Phase 6d — citation locators and list_sources ✅ (2026-10-09, deployed)
+- A citation's locator is ONE of: volume + page, page, or chapter/section title (`event_sources.section`, `page` now nullable; migration 0008). Volume alone is not a locator. A `hadith_ref` (collection + number) on the event also satisfies "at least one source".
+- Empty or placeholder locators (n/a, tbd, ?, 0, xxx, "(page)", Bangla "অজানা" …, non-numeric "pages") are refused at entry (`add_source_citation`, `attach_hadith_ref`) AND re-checked at publish: a stored citation or hadith ref with a bad locator blocks publishing and does not count as the source.
+- New `list_sources` (read access): registered books with author, edition/translator, citation count, optional filter, plus the locator rules. 43 tools.
+- Guidelines rule 5 + prompt step 3: never guess a page, volume, section or hadith number; call list_sources, ask the owner only for the locator, wait.
+- Live checks: `apps/web/scripts/smoke-sources-live.mjs` (temporary owner token + throw-away draft, all removed afterwards); `pnpm smoke:live` extended (`sourcesGate`, 43 tools).
