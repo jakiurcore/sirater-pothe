@@ -48,7 +48,7 @@ describe('event lifecycle', () => {
   it('publish is blocked until a source exists, then needs_verification gate, then works', async () => {
     const e = await call(owner, 'publish_event', { slug: 'first-revelation' })
     expect(e.isError).toBe(true)
-    expect(e.text).toMatch(/source citation/)
+    expect(e.text).toMatch(/At least one source/)
     expect((await call(owner, 'create_source', { slug: 'rahiq', book: 'আর-রাহীকুল মাখতূম', author: 'সাফিউর রহমান মোবারকপুরী' })).isError).toBe(false)
     expect((await call(owner, 'add_source_citation', { event_slug: 'first-revelation', source_slug: 'rahiq', volume: '1', page: '98' })).isError).toBe(false)
     // exactly one primary place is required too

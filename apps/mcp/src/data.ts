@@ -16,6 +16,8 @@ export interface EventAggregate {
   /** One short sentence per language above an ayah card. */
   ayatNotes: Row<typeof s.eventAyatNotes>[]
   hadith: Row<typeof s.eventHadith>[]
+  /** The hadith references behind `hadith` (collection + number), used by the publish gate. */
+  hadithRefs?: Row<typeof s.hadithRefs>[]
   people: Row<typeof s.eventPeople>[]
   recall: { question: Row<typeof s.recallQuestions>; translations: Row<typeof s.recallQuestionTranslations>[] }[]
   /** event_places rows: exactly one `primary` once publishable. */
@@ -78,12 +80,13 @@ export async function loadEventAggregate(db: Db, eventId: string): Promise<Event
     db.select().from(s.eventPlaces).where(eq(s.eventPlaces.eventId, eventId)).orderBy(asc(s.eventPlaces.orderIndex), asc(s.eventPlaces.placeId)),
     db.select().from(s.media).where(eq(s.media.eventId, eventId)).orderBy(asc(s.media.orderIndex), asc(s.media.createdAt), asc(s.media.id)),
   ])
+  const hadithRefs = hadith.length ? await db.select().from(s.hadithRefs).where(inArray(s.hadithRefs.id, hadith.map((h) => h.hadithId))) : []
   const alts = mediaRows.length ? await db.select().from(s.mediaAlt).where(inArray(s.mediaAlt.mediaId, mediaRows.map((m) => m.id))) : []
   const qt = qs.length
     ? await db.select().from(s.recallQuestionTranslations).where(inArray(s.recallQuestionTranslations.questionId, qs.map((q) => q.id)))
     : []
   return {
-    event, translations, sources, ayat, ayatNotes, hadith, people, places,
+    event, translations, sources, ayat, ayatNotes, hadith, hadithRefs, people, places,
     media: mediaRows.map((m) => ({ media: m, alts: alts.filter((a) => a.mediaId === m.id) })),
     recall: qs.map((question) => ({ question, translations: qt.filter((t) => t.questionId === question.id) })),
   }
@@ -282,7 +285,9 @@ export const countsFor = (agg: Pick<EventAggregate, 'translations'>, lang?: stri
 /** The single source of truth for "what blocks publishing this event". */
 export function blockersFor(agg: EventAggregate): string[] {
   return publishBlockers({
-    certainty: agg.event.certainty, sourceCount: agg.sources.length,
+    certainty: agg.event.certainty,
+    citations: agg.sources.map((c) => ({ volume: c.volume, page: c.page, section: c.section })),
+    hadith: agg.hadithRefs ?? [],
     translations: agg.translations.map((t) => ({ lang: t.lang, title: t.title, summary: t.summary, dispute_note: t.disputeNote })),
     primaryPlaceCount: agg.places.filter((p) => p.role === 'primary').length,
   })
@@ -362,7 +367,7 @@ export async function eventView(db: Db, eventId: string, lang?: string) {
     translation_langs: agg.translations.map((x) => ({ lang: x.lang, status: x.status })),
     sources: agg.sources.map((c) => {
       const src = srcRows.find((x) => x.id === c.sourceId)
-      return { citation_id: c.id, source: src?.slug, book: src?.book, author: src?.author, edition: src?.edition, volume: c.volume, page: c.page, note: c.note }
+      return { citation_id: c.id, source: src?.slug, book: src?.book, author: src?.author, edition: src?.edition, volume: c.volume, page: c.page, section: c.section, note: c.note }
     }),
     ayat: agg.ayat.map((a) => ({
       ...(ayah.get(a.ayahId) as object),

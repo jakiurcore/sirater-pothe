@@ -82,7 +82,7 @@ export interface EventPage {
   lessons: string[]
   ayat: AyahView[]
   hadith: { collection: string; number: string; grading: string; gradingBy: string | null; note: string | null }[]
-  sources: { book: string; author: string; edition: string | null; volume: string | null; page: string; note: string | null }[]
+  sources: { book: string; author: string; edition: string | null; volume: string | null; page: string | null; section: string | null; note: string | null }[]
   map: MapData
   /** Primary first, then related / route places; what the "place" fact shows. */
   placeLabel: string | null
@@ -275,7 +275,7 @@ export async function getEventPage({ slug, lang, preview = false, previewToken }
       .map((h) => ({ collection: h.collection, number: h.number, grading: h.grading, gradingBy: h.gradingBy, note: h.note })),
     sources: cites.map((c) => {
       const src = srcRows.find((x) => x.id === c.sourceId)
-      return { book: src?.book ?? '', author: src?.author ?? '', edition: src?.edition ?? null, volume: c.volume, page: c.page, note: c.note }
+      return { book: src?.book ?? '', author: src?.author ?? '', edition: src?.edition ?? null, volume: c.volume, page: c.page, section: c.section, note: c.note }
     }),
     map: { eventId: e.id, markers, route, label: markers.map((m) => m.name).join('، '), focus, maxZoom: zoom },
     placeLabel,

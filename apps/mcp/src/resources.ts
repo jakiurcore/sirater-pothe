@@ -10,7 +10,7 @@ const SCHEMA_REFERENCE = `# Data model (D1) and conventions
 - **events** (slug, era, order_index, hijri_year, gregorian_approx, prophet_age, route, certainty agreed|disputed, status draft|published|archived, needs_verification)
   - **event_translations** (lang, title, summary, key_details[], lessons[], dispute_note, my_reflection, status draft|published). Languages: ${Object.keys(SUPPORTED_LANGS).join(', ')} (default ${DEFAULT_LANG}).
   - **event_places** (event, place, role primary|related|route_start|route_end, order): exactly ONE primary (the map flies to it); related places are secondary markers; with several places the map fits them all. Tools: set_primary_place, add_event_place, remove_event_place. (events.place_id is a deprecated mirror of the primary.)
-  - sources via **event_sources** (source slug, volume, page, note); ayat via **event_ayat** (refs only; text filled by server); hadith via **event_hadith** (collection, number, grading); **recall_questions** (+translations: question, answer, distractors[]); **media** (kind: ${ALLOWED_MEDIA_KINDS.join(' | ')}; placement ${MEDIA_PLACEMENTS.join(' | ')}; after_index; order; credit, licence, author, source_url; alt + caption per language; responsive webp copies). **event_ayat** has the same placement / after_index / order, plus **event_ayat_notes** (one short sentence per language above the ayah card).
+  - sources via **event_sources** (source slug, volume, page, section, note; a locator is volume+page, page, or chapter/section title); ayat via **event_ayat** (refs only; text filled by server); hadith via **event_hadith** (collection, number, grading); **recall_questions** (+translations: question, answer, distractors[]); **media** (kind: ${ALLOWED_MEDIA_KINDS.join(' | ')}; placement ${MEDIA_PLACEMENTS.join(' | ')}; after_index; order; credit, licence, author, source_url; alt + caption per language; responsive webp copies). **event_ayat** has the same placement / after_index / order, plus **event_ayat_notes** (one short sentence per language above the ayah card).
 - **places** (slug, type region|city|site, parent_place (a site's city), zoom override, lat, lng, verified). Default map zoom: region ≈ 6, city ≈ 12, site ≈ 17 (capped where only coarse tiles exist). Sites such as the Kaaba (masjid-al-haram) and the Zamzam well (zamzam) belong to Makkah and **routes** (GeoJSON LineString, [lng, lat]).
 - **revisions** record before/after for every change; **audit_log** records every tool call.
 
@@ -20,7 +20,7 @@ Conventions
 - Ayat and pictures share ONE placement model (slots: hero, in_summary after paragraph N, after_summary, in_key_details after N, in_lessons after N, before_lessons, end, gallery for pictures only). Call get_event_layout before placing anything. A picture's or ayah's position is its structured placement; never write image markers or URLs into text fields.
 - Writes return a revision_id. revert_revision undoes it.
 - Editors can create and edit drafts; only the owner publishes, unpublishes and verifies places.
-- A publishable event has: a source citation (volume/page), a certainty flag (disputed ⇒ dispute_note), a default-language title and summary.
+- A publishable event has: a source (a citation with a locator, or a hadith reference), a certainty flag (disputed ⇒ dispute_note), a default-language title and summary.
 `
 
 export function registerResources(server: McpServer, ctx: ToolCtx) {
@@ -50,7 +50,7 @@ Do these steps in order, and stop to ask me whenever something is missing or unc
 
 1. DUPLICATES: call search_events and get_timeline_outline with the key names/terms. If a similar event exists, show it and ask whether to update it instead.
 2. STRUCTURE: restructure my notes into a Bangla title, a short summary, key_details and lessons, plus hijri year, approximate Gregorian year and the Prophet's ﷺ age if I gave them. Show it to me and fix what I correct. Decide era and where it belongs in the order; if the date is uncertain, propose certainty "disputed" with a dispute_note.
-3. SOURCE: ask me for the source book, volume and page (and edition). If I don't have it, say the event cannot be published without it, but you may still create the draft.
+3. SOURCE: call list_sources first. If my book is registered, ask me ONLY for the locator (volume+page, page, or chapter/section title; for a hadith: collection + number) and wait. Never guess a page or hadith number. If I don't have it, say the event cannot be published without it, but you may still create the draft.
 4. AYAT: suggest relevant surah:ayah REFERENCES only (never write Arabic). Call attach_ayah for each reference I accept, then show me the Arabic and Bangla the server returned and ask me to confirm each; detach_ayah any I reject. Ask me for hadith collection/number/grading if I want hadith.
 5. PLACE: use find_place; if missing use create_place (type region|city|site, lat then lng, parent_place_slug for a site's city). Be specific: the Zamzam well is a site, not just "Makkah". Call set_primary_place for the ONE primary place, add_event_place for related places. For a journey, create_route (GeoJSON [lng, lat]) and attach it with update_event.
 6. DRAFT: call create_event_draft, then create_source/add_source_citation, set_event_order, add_recall_questions (3 questions from facts stated in the event).

@@ -129,7 +129,10 @@ export const eventSources = sqliteTable('event_sources', {
   eventId: text('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
   sourceId: text('source_id').notNull().references(() => sources.id),
   volume: text('volume'),
-  page: text('page').notNull(),
+  /** Page number or range; null when the citation is by chapter/section title. */
+  page: text('page'),
+  /** Chapter / section / bab title (alternative locator). */
+  section: text('section'),
   note: text('note'),
 }, (t) => [index('event_sources_event').on(t.eventId)])
 

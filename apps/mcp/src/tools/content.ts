@@ -167,7 +167,7 @@ export function registerContentTools(server: McpServer, ctx: ToolCtx) {
   })
 
   defineTool(server, ctx, 'create_source', {
-    title: 'Create source', description: 'Register a book (title, author, edition) that can then be cited with add_source_citation.', access: 'write', input: SourceSchema,
+    title: 'Create source', description: 'Register a book (title, author, edition/translator) that can then be cited with add_source_citation. Call list_sources first: never register a book twice.', access: 'write', input: SourceSchema,
   }, async (a) => {
     if (await db.query.sources.findFirst({ where: eq(s.sources.slug, a.slug) })) throw new ToolError(`Source "${a.slug}" already exists; cite it with add_source_citation.`)
     const id = uuid()
@@ -178,18 +178,41 @@ export function registerContentTools(server: McpServer, ctx: ToolCtx) {
     return { ok: true, slug: a.slug, revision_id: revisionId }
   })
 
+  defineTool(server, ctx, 'list_sources', {
+    title: 'List registered sources',
+    description: 'The books the owner has already registered (slug, title, author, edition/translator) with how many events cite each. Use it before create_source or add_source_citation: pick the slug, then ASK THE OWNER ONLY FOR THE LOCATOR (volume+page, page, or chapter/section title). Optional text filter.',
+    access: 'read',
+    input: z.object({ query: z.string().trim().max(100).optional().describe('Filter on title, author or slug') }),
+  }, async (a) => {
+    const rows = await db.select().from(s.sources)
+    const counts = await db.select({ id: s.eventSources.sourceId, n: sql<number>`count(*)` }).from(s.eventSources).groupBy(s.eventSources.sourceId)
+    const q = a.query?.toLowerCase()
+    const list = rows
+      .filter((r) => !q || [r.slug, r.book, r.author, r.edition ?? ''].some((v) => v.toLowerCase().includes(q)))
+      .sort((x, y) => x.book.localeCompare(y.book))
+      .map((r) => ({ slug: r.slug, book: r.book, author: r.author, edition: r.edition, citations: counts.find((c) => c.id === r.id)?.n ?? 0 }))
+    return {
+      sources: list,
+      locator_rules: 'add_source_citation needs ONE of: page (optionally with volume), or a chapter/section title. Hadith: attach_hadith_ref (collection + number), which also counts as a source. Never guess a page or hadith number: ask the owner and wait.',
+    }
+  })
+
   defineTool(server, ctx, 'add_source_citation', {
-    title: 'Add source citation', description: 'Cite a registered source for an event with volume and page (required). At least one citation is required to publish.', access: 'write', input: CitationSchema,
+    title: 'Add source citation',
+    description: 'Cite a registered source (see list_sources) for an event. The locator must come from the owner and be ONE of: volume + page, page, or chapter/section title. Empty or placeholder locators are refused. At least one citation (or a hadith reference) is required to publish.',
+    access: 'write', input: CitationSchema,
   }, async (a) => {
     const ev = await eventBySlug(db, a.event_slug)
     assertCanEdit(ctx, ev.status)
     const src = await sourceBySlug(db, a.source_slug)
-    const dup = await db.query.eventSources.findFirst({ where: and(eq(s.eventSources.eventId, ev.id), eq(s.eventSources.sourceId, src.id), eq(s.eventSources.page, a.page), a.volume ? eq(s.eventSources.volume, a.volume) : sql`${s.eventSources.volume} is null`) })
-    if (dup) throw new ToolError('That exact citation (source, volume, page) is already on this event.')
+    const page = a.page?.trim() || null, section = a.section?.trim() || null, volume = a.volume?.trim() || null
+    const same = (col: typeof s.eventSources.page | typeof s.eventSources.section | typeof s.eventSources.volume, v: string | null) => (v ? eq(col, v) : sql`${col} is null`)
+    const dup = await db.query.eventSources.findFirst({ where: and(eq(s.eventSources.eventId, ev.id), eq(s.eventSources.sourceId, src.id), same(s.eventSources.page, page), same(s.eventSources.section, section), same(s.eventSources.volume, volume)) })
+    if (dup) throw new ToolError('That exact citation (source, volume, page / section) is already on this event.')
     const id = uuid()
     const { revisionId } = await withRevision(db, actor, {
       entity: 'event', entityId: ev.id, action: 'add_citation',
-      build: () => [db.insert(s.eventSources).values({ id, eventId: ev.id, sourceId: src.id, volume: a.volume ?? null, page: a.page, note: a.note ?? null }), touch(db, ev.id)],
+      build: () => [db.insert(s.eventSources).values({ id, eventId: ev.id, sourceId: src.id, volume, page, section, note: a.note ?? null }), touch(db, ev.id)],
     })
     return { ok: true, citation_id: id, event: a.event_slug, source: a.source_slug, revision_id: revisionId }
   })

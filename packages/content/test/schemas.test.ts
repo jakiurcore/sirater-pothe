@@ -124,7 +124,22 @@ describe('events', () => {
     expect(HijriYearSchema.safeParse(0).success).toBe(false)
     expect(HijriYearSchema.safeParse(-13).success).toBe(true)
   })
-  it('citation requires a page', () => expect(CitationSchema.safeParse({ event_slug: 'a', source_slug: 'b' }).success).toBe(false))
+  const cite = (o: object) => CitationSchema.safeParse({ event_slug: 'a', source_slug: 'b', ...o })
+  it('citation: volume+page, page, or section title are valid locators', () => {
+    for (const o of [{ volume: '1', page: '98' }, { page: '98' }, { page: '98-101' }, { page: '১২৩–১২৫' }, { page: 'xii' }, { page: '34, 36' }, { section: 'কিতাবুল ওহী' }, { section: 'Bab bad al-wahy' }, { volume: '2', section: 'Chapter of the Hijrah' }])
+      expect(cite(o).success, JSON.stringify(o)).toBe(true)
+  })
+  it('citation: empty, volume-only and placeholder locators are refused', () => {
+    for (const o of [{}, { volume: '1' }, { page: '' }, { page: '  ' }, { page: 'n/a' }, { page: 'TBD' }, { page: '?' }, { page: '-' }, { page: '0' }, { page: '000' }, { page: 'xxx' }, { page: '(page)' }, { page: 'unknown' }, { page: 'অজানা' }, { page: 'some page' }, { section: 'tbd' }, { section: 'abc' }, { section: '??' }, { page: '5', volume: 'n/a' }])
+      expect(cite(o).success, JSON.stringify(o)).toBe(false)
+    const e = cite({}); expect(e.success ? '' : e.error.issues[0]!.message).toMatch(/never guess/)
+  })
+  it('hadith ref: number must be real, collection not a placeholder', () => {
+    const h = (o: object) => HadithRefSchema.safeParse({ collection: 'Sahih al-Bukhari', number: '3', grading: 'Sahih', ...o }).success
+    expect(h({})).toBe(true); expect(h({ number: '১২৩৪' })).toBe(true); expect(h({ number: '12a' })).toBe(true)
+    for (const n of ['n/a', 'TBD', '?', '0', 'xxx', 'number']) expect(h({ number: n }), n).toBe(false)
+    expect(h({ collection: 'tbd' })).toBe(false)
+  })
   it('recall question needs distinct options', () => {
     expect(RecallQuestionSchema.safeParse({ event_slug: 'a', lang: 'bn', question: 'প্রশ্ন', answer: 'ক', distractors: ['খ', 'ক'] }).success).toBe(false)
     expect(RecallQuestionSchema.safeParse({ event_slug: 'a', lang: 'bn', question: 'প্রশ্ন', answer: 'ক', distractors: ['খ', 'গ'] }).success).toBe(true)
@@ -132,9 +147,23 @@ describe('events', () => {
 })
 
 describe('publishBlockers', () => {
-  const ok = { certainty: 'agreed' as const, sourceCount: 1, translations: [{ lang: 'bn', title: 't', summary: 's' }], primaryPlaceCount: 1 }
+  const ok = { certainty: 'agreed' as const, citations: [{ page: '98' }], translations: [{ lang: 'bn', title: 't', summary: 's' }], primaryPlaceCount: 1 }
   it('passes a complete event', () => expect(publishBlockers(ok)).toEqual([]))
-  it('requires a source', () => expect(publishBlockers({ ...ok, sourceCount: 0 })[0]).toMatch(/source citation/))
+  it('requires a source', () => expect(publishBlockers({ ...ok, citations: [] })[0]).toMatch(/At least one source/))
+  it('a hadith reference alone satisfies the source rule', () => {
+    expect(publishBlockers({ ...ok, citations: [], hadith: [{ collection: 'Sahih al-Bukhari', number: '3' }] })).toEqual([])
+    expect(publishBlockers({ ...ok, citations: [{ section: 'কিতাবুল ওহী' }] })).toEqual([])
+  })
+  it('a stored citation without a valid locator blocks publishing, even next to a good one', () => {
+    const b = publishBlockers({ ...ok, citations: [{ page: '98' }, { page: 'tbd' }] })
+    expect(b).toHaveLength(1); expect(b[0]).toMatch(/Citation #2.*placeholder/)
+    expect(publishBlockers({ ...ok, citations: [{ volume: '1' }] }).join(' ')).toMatch(/no locator/)
+    expect(publishBlockers({ ...ok, citations: [{ page: null }] }).length).toBeGreaterThan(0)
+  })
+  it('placeholder hadith references block and do not count as a source', () => {
+    const b = publishBlockers({ ...ok, citations: [], hadith: [{ collection: 'Bukhari', number: 'tbd' }] })
+    expect(b.join(' ')).toMatch(/hadith reference/); expect(b.join(' ')).toMatch(/At least one source/)
+  })
   it('requires certainty', () => expect(publishBlockers({ ...ok, certainty: null })[0]).toMatch(/Certainty/))
   it('requires default-lang translation', () => expect(publishBlockers({ ...ok, translations: [] })[0]).toMatch(/"bn" translation/))
   it('requires exactly one primary place', () => {

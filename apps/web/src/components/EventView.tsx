@@ -168,7 +168,7 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
                   <Icon d="book" size={16} />
                   <span>
                     {s.book}{s.author ? ` — ${s.author}` : ''}
-                    <small>{[s.volume ? f.t('source.vol', { v: s.volume }) : '', f.t('source.page', { p: s.page }), s.note ?? ''].filter(Boolean).join(' · ')}</small>
+                    <small>{[s.volume ? f.t('source.vol', { v: s.volume }) : '', s.page ? f.t('source.page', { p: s.page }) : '', s.section ?? '', s.note ?? ''].filter(Boolean).join(' · ')}</small>
                   </span>
                 </li>
               ))}

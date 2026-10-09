@@ -180,6 +180,35 @@ async function placesAndMedia(token: string) {
 }
 let created2 = true
 
+const SLUG4 = 'zz-smoke-sources-delete-me'
+/** Fourth scenario: list_sources, locator rules and the hadith-only source path, on a throw-away draft. */
+async function sourcesGate(token: string) {
+  console.log('\n── sources and locators ──')
+  let done = false
+  try {
+    const ls = await tool(token, 'list_sources', {})
+    ok(!ls.isError && Array.isArray(ls.json?.sources) && /Never guess/.test(ls.json.locator_rules), 'list_sources returns the registered books and the locator rules', ls.isError ? ls.text : `(${ls.json?.sources?.length} books)`)
+    const c = await tool(token, 'create_event_draft', { slug: SLUG4, era_slug: 'prophethood-in-makkah', hijri_year: -10, place_slug: 'zamzam', translation: { lang: 'bn', title: 'স্মোক টেস্ট: সূত্র (মুছে ফেলা হবে)', summary: 'এটি স্বয়ংক্রিয় পরীক্ষার খসড়া।' } })
+    ok(!c.isError, 'create_event_draft', c.isError ? c.text : '')
+    const book = ls.json?.sources?.[0]?.slug as string | undefined
+    if (book) {
+      for (const bad of [{ page: 'n/a' }, { page: 'TBD' }, { page: '0' }, { volume: '1' }, {}]) {
+        const r = await tool(token, 'add_source_citation', { event_slug: SLUG4, source_slug: book, ...bad })
+        ok(r.isError, `locator ${JSON.stringify(bad)} is refused`, r.isError ? '' : 'ACCEPTED')
+      }
+      const sec = await tool(token, 'add_source_citation', { event_slug: SLUG4, source_slug: book, section: 'পরীক্ষামূলক অধ্যায়ের শিরোনাম' })
+      ok(!sec.isError, 'a chapter/section title is a valid locator', sec.isError ? sec.text : '')
+    } else console.log('SKIP  no registered book to cite')
+    const h = await tool(token, 'get_event', { slug: SLUG4 })
+    ok(!(h.json?.publish_blockers as string[] | undefined)?.some((b) => /source/i.test(b)) || !book, 'the section citation satisfies the source rule', JSON.stringify(h.json?.publish_blockers))
+    const rv = await tool(token, 'list_revisions', { event_slug: SLUG4 })
+    const creation = rv.json?.revisions?.find((r: { action: string }) => r.action === 'create')
+    if (creation) { ok(!(await tool(token, 'revert_revision', { revision_id: creation.revision_id })).isError, 'revert deletes the test draft'); done = true }
+  } finally {
+    if (!done) console.log(`\n!! Test draft "${SLUG4}" may still exist. Remove it via revert_revision or tell Claude.`)
+  }
+}
+
 const SLUG3 = 'zz-smoke-uploads-delete-me'
 const sha = (b: Buffer | Uint8Array) => createHash('sha256').update(b).digest('hex')
 /** A JPEG with fake EXIF (GPS text) and a comment, structurally valid: proves the live server strips metadata. */
@@ -318,8 +347,8 @@ async function main() {
 
   const list = await rpc(token, 'tools/list')
   const names: string[] = list.body.result?.tools?.map((t: { name: string }) => t.name) ?? []
-  ok(names.length === 42, `tools/list returns all 42 tools`, `(${names.length})`)
-  for (const t of ['set_primary_place', 'add_event_place', 'remove_event_place', 'set_media_placement', 'attach_media', 'update_place', 'get_event_layout', 'set_ayah_placement', 'create_upload_url', 'create_upload_link', 'upload_media_begin', 'upload_media_chunk', 'upload_media_finish']) ok(names.includes(t), `tool ${t} is listed`)
+  ok(names.length === 43, `tools/list returns all 43 tools`, `(${names.length})`)
+  for (const t of ['set_primary_place', 'add_event_place', 'remove_event_place', 'set_media_placement', 'attach_media', 'update_place', 'get_event_layout', 'set_ayah_placement', 'create_upload_url', 'create_upload_link', 'upload_media_begin', 'upload_media_chunk', 'upload_media_finish', 'list_sources']) ok(names.includes(t), `tool ${t} is listed`)
 
   const eras = await tool(token, 'list_eras', {})
   ok(!eras.isError && eras.text.includes('prophethood-in-makkah'), 'list_eras sees the production seed (5 eras)')
@@ -360,6 +389,7 @@ async function main() {
   }
   await placesAndMedia(token)
   await placementAndUploads(token)
+  await sourcesGate(token)
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll checks passed')
 }
 main().catch((e) => { console.error('\nError:', e instanceof Error ? e.message : e); failed++ }).finally(() => { rl.close(); process.exit(failed ? 1 : 0) })

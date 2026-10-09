@@ -57,6 +57,13 @@
       "when": 1791543979903,
       "tag": "0007_drop_after_key_detail_index",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791556028604,
+      "tag": "0008_pretty_scrambler",
+      "breakpoints": true
     }
   ]
 }
