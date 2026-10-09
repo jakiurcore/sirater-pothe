@@ -162,3 +162,9 @@ Resizing uses Cloudflare's Images binding (`env.IMAGES`); if it is missing or fa
 - New `list_sources` (read access): registered books with author, edition/translator, citation count, optional filter, plus the locator rules. 43 tools.
 - Guidelines rule 5 + prompt step 3: never guess a page, volume, section or hadith number; call list_sources, ask the owner only for the locator, wait.
 - Live checks: `apps/web/scripts/smoke-sources-live.mjs` (temporary owner token + throw-away draft, all removed afterwards); `pnpm smoke:live` extended (`sourcesGate`, 43 tools).
+
+## Phase 6e — sources: ayah counts, warnings, removal tools, delete_draft ✅ (2026-10-09, deployed)
+- Source rule: ANY ONE of a valid book citation, a valid hadith_ref, or an attached ayah. An invalid stored citation / hadith ref only warns when another valid source exists (`publish_warnings` in get_event, `warnings` in publish_event / list_drafts) and is never shown on the public page; as the only source it blocks, and the message names it (id) and the fixing tool.
+- New tools (47 total): `remove_source_citation`, `update_source_citation`, `detach_hadith_ref` (editors on drafts, owner on published), `delete_draft` (owner; draft never published; exact `confirm_slug`; soft delete, `revert_revision` restores for 30 days; `list_drafts.recently_deleted`). get_event: each citation has `citation_id`, `valid`, `problem`; each hadith `hadith_ref_id`.
+- Nightly cron on seerah-mcp (03:00 UTC, `src/purge.ts`): deleted drafts older than 30 days (R2 files + history), expired preview tokens, used/expired upload links and chunk sessions, orphaned R2 pictures older than 2 days.
+- Data fix: citation "hadith no. 3364" removed from abdul-muttalib-rediscovers-zamzam and replaced by hadith_ref Sahih al-Bukhari 3364 (Ibn Abbas (রা.), Kitab Ahadith al-Anbiya in the note). Backup before: R2 `seerah-backups/manual/pre-citation-fix-20261009T150521Z.sql.gz`.
