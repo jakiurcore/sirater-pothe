@@ -64,6 +64,8 @@ try {
       ok(sw[0] <= sw[1], 'no horizontal scroll', `(${sw[0]}/${sw[1]})`)
       await page.screenshot({ path: `${OUT}${name}-2d.png` })
 
+      // wait for the opening camera flight to finish before measuring
+      for (let last = -1, i = 0; i < 40; i++) { const z = await num(page, 'zoom'); if (Math.abs(z - last) < 0.01) break; last = z; await page.waitForTimeout(800) }
       const z0 = await num(page, 'zoom')
       await btn(page, 'বড় করুন').click(); await page.waitForTimeout(900)
       ok((await num(page, 'zoom')) > z0 + 0.8, 'zoom + button zooms in', `(${z0.toFixed(1)} → ${(await num(page, 'zoom')).toFixed(1)})`)
@@ -115,7 +117,7 @@ try {
     }
   } finally { await browser.close() }
 } finally {
-  try { run(CLEANUP); const left = run(`SELECT (SELECT count(*) FROM events WHERE slug = '${SLUG}') e, (SELECT count(*) FROM routes WHERE slug = 'zz-smoke-route') r, (SELECT count(*) FROM preview_tokens WHERE created_by = 'smoke-web') t;`); console.log('\ncleanup:', /"e": 0,\s*"r": 0,\s*"t": 0/.test(left) ? 'all temporary rows deleted' : 'CHECK LEFTOVERS\n' + left) } catch (e) { console.error('CLEANUP FAILED, remove zz-smoke-* rows manually', e.message) }
+  try { run(CLEANUP); const left = run(`SELECT (SELECT count(*) FROM events WHERE slug = '${SLUG}') e, (SELECT count(*) FROM routes WHERE slug = 'zz-smoke-route') r, (SELECT count(*) FROM preview_tokens WHERE created_by = 'smoke-web') t;`); console.log('\ncleanup:', ['e', 'r', 't'].every((k) => new RegExp(`"${k}":\\s*0\\b`).test(left)) ? 'all temporary rows deleted' : 'CHECK LEFTOVERS\n' + left) } catch (e) { console.error('CLEANUP FAILED, remove zz-smoke-* rows manually', e.message) }
 }
 console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll checks passed')
 process.exit(failed ? 1 : 0)
