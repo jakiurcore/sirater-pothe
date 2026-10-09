@@ -167,35 +167,51 @@ export const RecallQuestionSchema = z.object({
 
 // ───────────── media: no people, ever ─────────────
 export const ALLOWED_MEDIA_KINDS = ['map', 'landscape', 'architecture', 'object', 'pattern', 'calligraphy'] as const
-export const ALLOWED_MEDIA_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/avif'] as const // SVG rejected: can embed script
-export const MAX_MEDIA_BYTES = 5 * 1024 * 1024
+export const ALLOWED_MEDIA_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const // SVG rejected (can embed script); AVIF not accepted
+export const MAX_MEDIA_BYTES = 10 * 1024 * 1024
 
 export const MediaKindSchema = z.enum(ALLOWED_MEDIA_KINDS, {
   error: () => `kind must be one of: ${ALLOWED_MEDIA_KINDS.join(', ')}. Images depicting people (the Prophet ﷺ, other prophets, companions, family, angels) are never allowed.`,
 })
 
-// Where a picture sits inside the event page. Structured only: never put markers inside text fields.
-import { MEDIA_PLACEMENTS, placementProblem, type MediaPlacement } from './placement'
-export { MEDIA_PLACEMENTS, placementProblem, type MediaPlacement }
-export const MediaPlacementSchema = z.enum(MEDIA_PLACEMENTS, { error: () => `placement must be one of: ${MEDIA_PLACEMENTS.join(', ')}.` })
+// Placement is shared with ayat (see placement.ts).
+import { PLACEMENTS, placementProblem, type Placement } from './placement'
+export { PLACEMENTS, MEDIA_PLACEMENTS, INDEXED_PLACEMENTS, placementProblem, placementNeedsReview, slotCounts, summaryParagraphs, slotSort, type Placement, type MediaPlacement, type SlotCounts, type ItemKind } from './placement'
+export const PlacementSchema = z.enum(PLACEMENTS, { error: () => `placement must be one of: ${PLACEMENTS.join(', ')}.` })
+export const MediaPlacementSchema = PlacementSchema
 
+const PLACEMENT_HELP = 'hero: under the title; in_summary: after summary paragraph N; after_summary; in_key_details: after key detail N; in_lessons: after lesson N; before_lessons; end: after the lessons; gallery (pictures only): grid at the end.'
+const afterIndex = z.number().int().min(0).max(49).optional().describe('0-based. Required for in_summary (after paragraph N), in_key_details (after key detail N) and in_lessons (after lesson N); omit otherwise. Must exist in the event text: call get_event_layout first.')
+const slotOrder = z.number().int().min(0).max(9999).optional().describe('Order inside the slot (lowest first); ayat and pictures can share a slot.')
+/** Placement fields for pictures (default: gallery). */
 export const PlacementFields = {
-  placement: MediaPlacementSchema.default('gallery').describe('hero: under the title; after_summary; in_key_details: after one key detail (needs after_key_detail_index); before_lessons; gallery (default): grid at the end.'),
-  after_key_detail_index: z.number().int().min(0).max(14).optional().describe('Only for in_key_details. 0-based: 0 puts the picture after the FIRST key detail, 1 after the second, and so on. It must exist in the default-language key_details.'),
-  order: z.number().int().min(0).max(999).optional().describe('Order among pictures with the same placement (lowest first).'),
+  placement: PlacementSchema.default('gallery').describe(PLACEMENT_HELP),
+  after_index: afterIndex,
+  order: slotOrder,
+}
+/** Placement fields for ayat (default: after_summary; gallery is not allowed). */
+export const AyahPlacementFields = {
+  placement: PlacementSchema.exclude(['gallery']).default('after_summary').describe(PLACEMENT_HELP),
+  after_index: afterIndex,
+  order: slotOrder,
+}
+
+/** What every way of adding a picture needs to know (the pixels come separately: base64, a URL, a PUT, a link, chunks). */
+export const MediaMetaShape = {
+  kind: MediaKindSchema,
+  alt: z.partialRecord(LangSchema, z.string().trim().min(3).max(300)).refine((a) => Object.keys(a).length > 0, 'alt text is required in at least one language'),
+  caption: z.partialRecord(LangSchema, z.string().trim().min(1).max(300)).optional().describe('Optional caption shown under the picture, per language.'),
+  credit: z.string().trim().min(1).max(200).optional().describe('Optional credit / licence line, e.g. "Photo: … (CC BY-SA 4.0)". Wikimedia Commons pictures get theirs automatically.'),
+  ...PlacementFields,
+  contains_people_confirmation: z.literal(false, { error: 'contains_people_confirmation must be false: images with any people, faces or figures are rejected.' }),
 }
 
 export const UploadMediaSchema = z.object({
-  kind: MediaKindSchema,
-  mime: z.enum(ALLOWED_MEDIA_MIME),
-  alt: z.partialRecord(LangSchema, z.string().trim().min(3).max(300)).refine((a) => Object.keys(a).length > 0, 'alt text is required in at least one language'),
-  caption: z.partialRecord(LangSchema, z.string().trim().min(1).max(300)).optional().describe('Optional caption shown under the picture, per language.'),
-  credit: z.string().trim().min(1).max(200).optional().describe('Optional credit / licence line, e.g. "Photo: … (CC BY-SA 4.0)".'),
-  ...PlacementFields,
-  contains_people_confirmation: z.literal(false, { error: 'contains_people_confirmation must be false: images with any people, faces or figures are rejected.' }),
+  ...MediaMetaShape,
+  mime: z.enum(ALLOWED_MEDIA_MIME).optional().describe('Optional; the file content is sniffed. If given it must match.'),
   base64: z.string().min(1),
 }).superRefine((v, ctx) => {
-  const pp = placementProblem(v)
+  const pp = placementProblem(v, 'media')
   if (pp) ctx.addIssue({ code: 'custom', path: ['placement'], message: pp })
   const approxBytes = Math.floor((v.base64.length * 3) / 4)
   if (approxBytes > MAX_MEDIA_BYTES) ctx.addIssue({ code: 'custom', path: ['base64'], message: `image is ${approxBytes} bytes; the limit is ${MAX_MEDIA_BYTES}.` })
@@ -216,9 +232,6 @@ export interface PublishCandidate {
   defaultLang?: string
   /** Places linked to the event with role "primary". Exactly one is required. */
   primaryPlaceCount: number
-  /** Number of key_details in the default-language translation, and the event's pictures, to validate placements. */
-  keyDetailCount?: number
-  media?: { id: string; placement: MediaPlacement; after_key_detail_index?: number | null }[]
 }
 
 /** Returns a list of problems that block publishing; empty means publishable. */
@@ -232,10 +245,6 @@ export function publishBlockers(c: PublishCandidate): string[] {
   if (c.certainty === 'disputed' && !c.translations.some((x) => x.dispute_note)) out.push('Certainty is "disputed" but no dispute_note explains the positions.')
   if (c.primaryPlaceCount === 0) out.push('No primary place. Use set_primary_place (or add_event_place with role "primary").')
   else if (c.primaryPlaceCount > 1) out.push(`${c.primaryPlaceCount} primary places; exactly one is allowed. Use set_primary_place to choose.`)
-  for (const m of c.media ?? []) {
-    const pp = placementProblem(m, c.keyDetailCount ?? 0)
-    if (pp) out.push(`Picture ${m.id}: ${pp} Fix it with set_media_placement.`)
-  }
   return out
 }
 

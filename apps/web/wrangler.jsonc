@@ -9,7 +9,8 @@
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "seerah-web" }],
   // Routes/custom domains are NOT hardcoded: scripts/render-wrangler.mjs (phase 5) injects $DOMAIN from the environment.
   "vars": {
-    "WEB_ORIGIN": "http://localhost:3000"
+    "WEB_ORIGIN": "http://localhost:3000",
+    "MCP_ORIGIN": "http://localhost:8787"
   },
   "d1_databases": [
     {

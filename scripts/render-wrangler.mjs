@@ -33,7 +33,7 @@ const preview = suffix !== ''
 const web = read('web')
 web.name += suffix
 web.services = [{ binding: 'WORKER_SELF_REFERENCE', service: web.name }]
-web.vars = { ...web.vars, WEB_ORIGIN: site, INDEXING: indexing }
+web.vars = { ...web.vars, WEB_ORIGIN: site, MCP_ORIGIN: mcp, INDEXING: indexing }
 if (!preview) web.routes = [{ pattern: domain, custom_domain: true }]
 
 const api = read('mcp')

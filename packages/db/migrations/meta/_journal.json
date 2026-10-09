@@ -36,6 +36,27 @@
       "when": 1791531546991,
       "tag": "0004_zamzam_event_primary_place",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791543970177,
+      "tag": "0005_placement_ayat_uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791543979313,
+      "tag": "0006_placement_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791543979903,
+      "tag": "0007_drop_after_key_detail_index",
+      "breakpoints": true
     }
   ]
 }

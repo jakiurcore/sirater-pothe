@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import type { Db } from '@seerah/db'
 import { schema as s } from '@seerah/db'
-import { DEFAULT_LANG, publishBlockers, placeZoom, type EventPlaceRole, type PlaceType } from '@seerah/content'
+import { DEFAULT_LANG, publishBlockers, placeZoom, placementNeedsReview, slotCounts, type EventPlaceRole, type PlaceType, type SlotCounts } from '@seerah/content'
 import { ToolError, nowIso, uuid } from './util'
 import type { Actor } from './env'
 
@@ -13,6 +13,8 @@ export interface EventAggregate {
   translations: Row<typeof s.eventTranslations>[]
   sources: Row<typeof s.eventSources>[]
   ayat: Row<typeof s.eventAyat>[]
+  /** One short sentence per language above an ayah card. */
+  ayatNotes: Row<typeof s.eventAyatNotes>[]
   hadith: Row<typeof s.eventHadith>[]
   people: Row<typeof s.eventPeople>[]
   recall: { question: Row<typeof s.recallQuestions>; translations: Row<typeof s.recallQuestionTranslations>[] }[]
@@ -65,10 +67,11 @@ export async function sourceBySlug(db: Db, slug: string) {
 export async function loadEventAggregate(db: Db, eventId: string): Promise<EventAggregate | null> {
   const event = await db.query.events.findFirst({ where: eq(s.events.id, eventId) })
   if (!event) return null
-  const [translations, sources, ayat, hadith, people, qs, places, mediaRows] = await Promise.all([
+  const [translations, sources, ayat, ayatNotes, hadith, people, qs, places, mediaRows] = await Promise.all([
     db.select().from(s.eventTranslations).where(eq(s.eventTranslations.eventId, eventId)).orderBy(asc(s.eventTranslations.lang)),
     db.select().from(s.eventSources).where(eq(s.eventSources.eventId, eventId)).orderBy(asc(s.eventSources.id)),
-    db.select().from(s.eventAyat).where(eq(s.eventAyat.eventId, eventId)).orderBy(asc(s.eventAyat.orderIndex)),
+    db.select().from(s.eventAyat).where(eq(s.eventAyat.eventId, eventId)).orderBy(asc(s.eventAyat.orderIndex), asc(s.eventAyat.ayahId)),
+    db.select().from(s.eventAyatNotes).where(eq(s.eventAyatNotes.eventId, eventId)),
     db.select().from(s.eventHadith).where(eq(s.eventHadith.eventId, eventId)),
     db.select().from(s.eventPeople).where(eq(s.eventPeople.eventId, eventId)),
     db.select().from(s.recallQuestions).where(eq(s.recallQuestions.eventId, eventId)).orderBy(asc(s.recallQuestions.orderIndex)),
@@ -80,7 +83,7 @@ export async function loadEventAggregate(db: Db, eventId: string): Promise<Event
     ? await db.select().from(s.recallQuestionTranslations).where(inArray(s.recallQuestionTranslations.questionId, qs.map((q) => q.id)))
     : []
   return {
-    event, translations, sources, ayat, hadith, people, places,
+    event, translations, sources, ayat, ayatNotes, hadith, people, places,
     media: mediaRows.map((m) => ({ media: m, alts: alts.filter((a) => a.mediaId === m.id) })),
     recall: qs.map((question) => ({ question, translations: qt.filter((t) => t.questionId === question.id) })),
   }
@@ -93,6 +96,7 @@ export function restoreEventStatements(db: Db, snap: EventAggregate): BatchStmt[
     db.update(s.events).set({ ...snap.event, updatedAt: nowIso() }).where(eq(s.events.id, id)),
     db.delete(s.eventTranslations).where(eq(s.eventTranslations.eventId, id)),
     db.delete(s.eventSources).where(eq(s.eventSources.eventId, id)),
+    db.delete(s.eventAyatNotes).where(eq(s.eventAyatNotes.eventId, id)),
     db.delete(s.eventAyat).where(eq(s.eventAyat.eventId, id)),
     db.delete(s.eventHadith).where(eq(s.eventHadith.eventId, id)),
     db.delete(s.eventPeople).where(eq(s.eventPeople.eventId, id)),
@@ -113,6 +117,7 @@ export function restoreEventStatements(db: Db, snap: EventAggregate): BatchStmt[
   if (snap.translations.length) st.push(db.insert(s.eventTranslations).values(snap.translations))
   if (snap.sources.length) st.push(db.insert(s.eventSources).values(snap.sources))
   if (snap.ayat.length) st.push(db.insert(s.eventAyat).values(snap.ayat))
+  if (snap.ayatNotes?.length) st.push(db.insert(s.eventAyatNotes).values(snap.ayatNotes)) // snapshots from before placement notes have none
   if (snap.hadith.length) st.push(db.insert(s.eventHadith).values(snap.hadith))
   if (snap.people.length) st.push(db.insert(s.eventPeople).values(snap.people))
   for (const q of snap.recall) {
@@ -267,9 +272,12 @@ export async function placeView(db: Db, placeId: string | null) {
   return rest
 }
 
-/** Number of key_details in the default-language translation (what placement indexes refer to). */
-export const keyDetailCount = (agg: Pick<EventAggregate, 'translations'>): number =>
-  (agg.translations.find((t) => t.lang === DEFAULT_LANG) ?? agg.translations[0])?.keyDetails.length ?? 0
+/** The translation placements are validated against (the default language, else whatever exists). */
+const baseTranslation = (agg: Pick<EventAggregate, 'translations'>) => agg.translations.find((t) => t.lang === DEFAULT_LANG) ?? agg.translations[0]
+export const countsFor = (agg: Pick<EventAggregate, 'translations'>, lang?: string): SlotCounts => {
+  const t = (lang ? agg.translations.find((x) => x.lang === lang) : undefined) ?? baseTranslation(agg)
+  return slotCounts({ summary: t?.summary, keyDetails: t?.keyDetails, lessons: t?.lessons })
+}
 
 /** The single source of truth for "what blocks publishing this event". */
 export function blockersFor(agg: EventAggregate): string[] {
@@ -277,16 +285,36 @@ export function blockersFor(agg: EventAggregate): string[] {
     certainty: agg.event.certainty, sourceCount: agg.sources.length,
     translations: agg.translations.map((t) => ({ lang: t.lang, title: t.title, summary: t.summary, dispute_note: t.disputeNote })),
     primaryPlaceCount: agg.places.filter((p) => p.role === 'primary').length,
-    keyDetailCount: keyDetailCount(agg),
-    media: agg.media.map((m) => ({ id: m.media.id, placement: m.media.placement, after_key_detail_index: m.media.afterKeyDetailIndex })),
   })
+}
+
+export interface ReviewItem { kind: 'ayah' | 'media'; id: string; placement: string; after_index: number; section: string; langs: { lang: string; count: number }[]; fix: string }
+/**
+ * Items whose after_index no longer exists in the text of some language (a paragraph / key detail / lesson was removed).
+ * The page does not break: such an item is shown at the END of that section. This lists them so an AI or the owner can re-place them.
+ */
+export function placementReview(agg: EventAggregate): ReviewItem[] {
+  const out: ReviewItem[] = []
+  const check = (kind: 'ayah' | 'media', id: string, placement: string, afterIndex: number | null) => {
+    const langs: ReviewItem['langs'] = []
+    let section = ''
+    for (const t of agg.translations) {
+      const r = placementNeedsReview({ placement: placement as never, after_index: afterIndex }, slotCounts({ summary: t.summary, keyDetails: t.keyDetails, lessons: t.lessons }))
+      if (r) { section = r.section; langs.push({ lang: t.lang, count: r.count }) }
+    }
+    if (langs.length) out.push({ kind, id, placement, after_index: afterIndex!, section, langs, fix: `Shown at the end of ${section} for now. Use ${kind === 'ayah' ? 'set_ayah_placement' : 'set_media_placement'} to choose a slot that exists (see get_event_layout).` })
+  }
+  for (const a of agg.ayat) check('ayah', a.ayahId, a.placement, a.afterIndex)
+  for (const m of agg.media) check('media', m.media.id, m.media.placement, m.media.afterIndex)
+  return out
 }
 
 export function mediaView(m: EventAggregate['media'][number], lang: string) {
   const alt = pickLang(m.alts, lang)
   return {
-    media_id: m.media.id, kind: m.media.kind, placement: m.media.placement, after_key_detail_index: m.media.afterKeyDetailIndex,
-    order: m.media.orderIndex, credit: m.media.credit, width: m.media.width, height: m.media.height, r2_key: m.media.r2Key,
+    media_id: m.media.id, kind: m.media.kind, placement: m.media.placement, after_index: m.media.afterIndex,
+    order: m.media.orderIndex, credit: m.media.credit, license: m.media.license, author: m.media.author, source_url: m.media.sourceUrl,
+    width: m.media.width, height: m.media.height, variants: m.media.variants ? Object.keys(m.media.variants).map(Number) : [], r2_key: m.media.r2Key,
     alt: alt?.alt ?? null, caption: alt?.caption ?? null,
     languages: m.alts.map((a) => a.lang),
   }
@@ -336,7 +364,12 @@ export async function eventView(db: Db, eventId: string, lang?: string) {
       const src = srcRows.find((x) => x.id === c.sourceId)
       return { citation_id: c.id, source: src?.slug, book: src?.book, author: src?.author, edition: src?.edition, volume: c.volume, page: c.page, note: c.note }
     }),
-    ayat: agg.ayat.map((a) => ayah.get(a.ayahId)),
+    ayat: agg.ayat.map((a) => ({
+      ...(ayah.get(a.ayahId) as object),
+      placement: a.placement, after_index: a.afterIndex, order: a.orderIndex,
+      placement_note: Object.fromEntries(agg.ayatNotes.filter((n) => n.ayahId === a.ayahId).map((n) => [n.lang, n.note])),
+    })),
+    needs_placement_review: placementReview(agg),
     hadith: agg.hadith.map((h) => hadithRows.find((x) => x.id === h.hadithId)).filter(Boolean).map((h) => ({ collection: h!.collection, number: h!.number, grading: h!.grading, grading_by: h!.gradingBy, note: h!.note })),
     recall_questions: agg.recall.map((q) => {
       const qt = pickLang(q.translations, l)

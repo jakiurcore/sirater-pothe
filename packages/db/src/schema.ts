@@ -152,8 +152,21 @@ export const ayahTranslations = sqliteTable('ayah_translations', {
 export const eventAyat = sqliteTable('event_ayat', {
   eventId: text('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
   ayahId: text('ayah_id').notNull().references(() => ayat.id),
+  /** Order inside its slot (ayat and pictures share slots; lowest first). */
   orderIndex: integer('order_index').notNull().default(0),
+  /** Same placement model as media (see @seerah/content placement). `hero` + a high order = where ayat rendered before placement existed. */
+  placement: text('placement', { enum: ['hero', 'in_summary', 'after_summary', 'in_key_details', 'in_lessons', 'before_lessons', 'end'] }).notNull().default('hero'),
+  /** 0-based paragraph / key detail / lesson it follows (in_summary / in_key_details / in_lessons only). */
+  afterIndex: integer('after_index'),
 }, (t) => [primaryKey({ columns: [t.eventId, t.ayahId] })])
+
+/** A short sentence per language, shown small above the ayah card, saying why the ayah is in this spot. */
+export const eventAyatNotes = sqliteTable('event_ayat_notes', {
+  eventId: text('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  ayahId: text('ayah_id').notNull().references(() => ayat.id),
+  lang: text('lang').notNull(),
+  note: text('note').notNull(),
+}, (t) => [primaryKey({ columns: [t.eventId, t.ayahId, t.lang] })])
 
 // ───────── hadith (references only) ─────────
 export const hadithRefs = sqliteTable('hadith_refs', {
@@ -192,13 +205,21 @@ export const media = sqliteTable('media', {
   bytes: integer('bytes').notNull(),
   eventId: text('event_id').references(() => events.id, { onDelete: 'set null' }),
   /** Where it sits in the event page. Structured only: never markers inside text. */
-  placement: text('placement', { enum: ['hero', 'after_summary', 'in_key_details', 'before_lessons', 'gallery'] }).notNull().default('gallery'),
-  /** 0-based key detail the picture follows; only for placement in_key_details. */
-  afterKeyDetailIndex: integer('after_key_detail_index'),
+  placement: text('placement', { enum: ['hero', 'in_summary', 'after_summary', 'in_key_details', 'in_lessons', 'before_lessons', 'end', 'gallery'] }).notNull().default('gallery'),
+  /** 0-based paragraph / key detail / lesson the picture follows (in_summary / in_key_details / in_lessons only). */
+  afterIndex: integer('after_index'),
   orderIndex: integer('order_index').notNull().default(0),
   credit: text('credit'),
   width: integer('width'),
   height: integer('height'),
+  /** Where the picture came from and under which licence (filled automatically for Wikimedia Commons). */
+  license: text('license'),
+  author: text('author'),
+  sourceUrl: text('source_url'),
+  /** Responsive copies: { "480": "media/<id>-480.webp", ... }. Empty/null: only the original exists. */
+  variants: text('variants', { mode: 'json' }).$type<Record<string, string>>(),
+  /** SHA-256 of the stored original (after metadata stripping). */
+  sha256: text('sha256'),
   createdAt: createdAt(),
 }, (t) => [index('media_event').on(t.eventId)])
 export const mediaAlt = sqliteTable('media_alt', {
@@ -288,4 +309,37 @@ export const rateLimits = sqliteTable('rate_limits', {
   key: text('key').primaryKey(),
   windowStart: integer('window_start').notNull(),
   count: integer('count').notNull(),
+})
+
+// ───────── picture uploads that do not go through a tool call ─────────
+/** One-time upload credentials: a signed PUT URL (mode "put") or a link to the site's upload page (mode "link"). Only a hash is stored. */
+export const uploadTokens = sqliteTable('upload_tokens', {
+  tokenHash: text('token_hash').primaryKey(),
+  mode: text('mode', { enum: ['put', 'link'] }).notNull(),
+  createdBy: text('created_by').notNull(),
+  eventId: text('event_id').references(() => events.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  placement: text('placement').notNull(),
+  afterIndex: integer('after_index'),
+  orderIndex: integer('order_index'),
+  alt: text('alt', { mode: 'json' }).$type<Record<string, string>>().notNull(),
+  caption: text('caption', { mode: 'json' }).$type<Record<string, string>>(),
+  credit: text('credit'),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'),
+  attempts: integer('attempts').notNull().default(0),
+  mediaId: text('media_id'),
+  createdAt: createdAt(),
+})
+
+/** Chunked uploads (the fallback for clients that can only send small JSON messages). Chunks themselves wait in R2 under tmp/<id>/. */
+export const uploadSessions = sqliteTable('upload_sessions', {
+  id: id(),
+  createdBy: text('created_by').notNull(),
+  totalSize: integer('total_size').notNull(),
+  sha256: text('sha256').notNull(),
+  chunkSize: integer('chunk_size').notNull(),
+  meta: text('meta', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: createdAt(),
 })

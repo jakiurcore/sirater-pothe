@@ -3,6 +3,7 @@ import { and, eq, sql, asc } from 'drizzle-orm'
 import { schema as s } from '@seerah/db'
 import { LangSchema, SlugSchema, StatusSchema, DEFAULT_LANG } from '@seerah/content'
 import { defineTool, type ToolCtx } from './kit'
+import { buildLayout } from '../layout'
 import { blockersFor, eraBySlug, eventBySlug, eventView, loadEventAggregate, titles } from '../data'
 import type { McpServer } from '@modelcontextprotocol/server'
 
@@ -72,6 +73,16 @@ export function registerReadTools(server: McpServer, ctx: ToolCtx) {
     const view = await eventView(db, e.id, lang)
     const agg = (await loadEventAggregate(db, e.id))!
     return { ...view, publish_blockers: blockersFor(agg) }
+  })
+
+  defineTool(server, ctx, 'get_event_layout', {
+    title: 'Get event layout (read before placing)',
+    description: 'The event page as NUMBERED SLOTS: summary paragraphs [0..n], key details [0..n], lessons [0..n] (each with its first ~80 characters) and what is already placed after each of them (ayat and pictures), plus the hero / after_summary / before_lessons / end / gallery slots and anything that needs_placement_review. Call this BEFORE attach_ayah, upload_media or any set_*_placement: choose the slot whose text the ayah or picture directly supports, explain the choice to the owner, and use that after_index.',
+    access: 'read',
+    input: z.object({ event: SlugSchema.describe('event slug'), lang: LangSchema.optional().describe('language of the text to show (default: the default language)') }),
+  }, async ({ event, lang }) => {
+    const e = await eventBySlug(db, event)
+    return buildLayout((await loadEventAggregate(db, e.id))!, lang ?? DEFAULT_LANG)
   })
 
   defineTool(server, ctx, 'list_eras', {

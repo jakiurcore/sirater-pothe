@@ -4,7 +4,7 @@ import { schema as s, type Db } from '@seerah/db'
 import { addHonorific } from '@seerah/content/honorific'
 import { DEFAULT_LANG, type Lang } from '@seerah/content/langs'
 import { effectiveZoom, type EventPlaceRole, type PlaceType } from '@seerah/content/geo'
-import type { MediaPlacement } from '@seerah/content/placement'
+import { slotCounts, summaryParagraphs, type Placement, type SlotCounts } from '@seerah/content/placement'
 import { getDatabase } from './env'
 
 /** "Always render ﷺ after the Prophet's name": enforced again at render time, whatever is stored. */
@@ -38,15 +38,20 @@ export interface Timeline {
   events: EventCard[]
 }
 export interface MapMarker { slug: string; name: string; lng: number; lat: number; highlight: boolean; role: EventPlaceRole | 'route' }
-export interface MediaItem {
+/** Fields every positioned item (ayah card or picture) has: see @seerah/content placement. */
+export interface Slotted { placement: Placement; afterIndex: number | null; order: number }
+export interface MediaItem extends Slotted {
+  kind: 'media'
   id: string
   src: string
-  placement: MediaPlacement
-  /** 0-based key detail the picture follows (placement in_key_details). */
-  afterKeyDetailIndex: number | null
+  /** Responsive copies (webp), smallest first; empty when only the original exists. */
+  variants: { w: number; src: string }[]
   alt: string
   caption: string | null
+  /** Credit line: the one given with the upload, else built from the Commons author + licence. */
   credit: string | null
+  /** Where the picture comes from (Commons page), when known. */
+  sourceUrl: string | null
   width: number | null
   height: number | null
 }
@@ -60,7 +65,7 @@ export interface MapData {
   /** With several places or a route the camera fits them all, but never closer than this (the primary place's zoom). */
   maxZoom: number | null
 }
-export interface AyahView { ref: string; surah: number; ayah: number; arabic: string; translation: string | null; translationSource: string | null; translationLicense: string | null }
+export interface AyahView extends Slotted { kind: 'ayah'; /** one short sentence above the card (why it is here), in the page language */ note: string | null; ref: string; surah: number; ayah: number; arabic: string; translation: string | null; translationSource: string | null; translationLicense: string | null }
 export interface EventPage {
   card: EventCard
   status: 'draft' | 'published' | 'archived'
@@ -69,6 +74,10 @@ export interface EventPage {
   certainty: 'agreed' | 'disputed'
   disputeNote: string | null
   summary: string
+  /** The summary split on blank lines (placements can point between paragraphs). */
+  summaryParagraphs: string[]
+  /** What exists to point at, per section: validates / clamps placements. */
+  slotCounts: SlotCounts
   keyDetails: string[]
   lessons: string[]
   ayat: AyahView[]
@@ -188,12 +197,13 @@ export async function getEventPage({ slug, lang, preview = false, previewToken }
   const srcIds = [...new Set(cites.map((c) => c.sourceId))]
   const ayahIds = ayahLinks.map((a) => a.ayahId)
   const hadithIds = hadithLinks.map((h) => h.hadithId)
-  const [srcRows, ayahRows, ayahTr, hadithRows, datasets] = await Promise.all([
+  const [srcRows, ayahRows, ayahTr, hadithRows, datasets, ayahNotes] = await Promise.all([
     srcIds.length ? db.select().from(s.sources).where(inArray(s.sources.id, srcIds)) : [],
     ayahIds.length ? db.select().from(s.ayat).where(inArray(s.ayat.id, ayahIds)) : [],
     ayahIds.length ? db.select().from(s.ayahTranslations).where(and(inArray(s.ayahTranslations.ayahId, ayahIds), eq(s.ayahTranslations.lang, lang))) : [],
     hadithIds.length ? db.select().from(s.hadithRefs).where(inArray(s.hadithRefs.id, hadithIds)) : [],
     db.select().from(s.contentDatasets),
+    db.select().from(s.eventAyatNotes).where(eq(s.eventAyatNotes.eventId, e.id)),
   ])
   const datasetName = new Map(datasets.map((d) => [d.id, d.name]))
 
@@ -211,12 +221,15 @@ export async function getEventPage({ slug, lang, preview = false, previewToken }
   const zoom = primary ? effectiveZoom(primary.place.type as PlaceType, primary.place.zoomOverride, primary.place.lng, primary.place.lat) : null
   const focus = primary && markers.length === 1 && !route ? { lng: primary.place.lng, lat: primary.place.lat, zoom: zoom! } : null
 
+  const withToken = (id: string, w?: number) => `/media/${id}${[previewToken ? `token=${encodeURIComponent(previewToken)}` : '', w ? `w=${w}` : ''].filter(Boolean).map((q, i) => (i ? '&' : '?') + q).join('')}`
   const media: MediaItem[] = mediaRows.map((m) => {
     const alts = mediaAlts.filter((a) => a.mediaId === m.id)
     const a = alts.find((x) => x.lang === lang) ?? alts.find((x) => x.lang === DEFAULT_LANG) ?? alts[0]
+    const credit = m.credit ?? (m.author || m.license ? [m.author, m.license, m.sourceUrl?.includes('wikimedia') ? 'via Wikimedia Commons' : null].filter(Boolean).join(', ') : null)
     return {
-      id: m.id, src: `/media/${m.id}${previewToken ? `?token=${encodeURIComponent(previewToken)}` : ''}`, placement: m.placement, afterKeyDetailIndex: m.afterKeyDetailIndex,
-      alt: hon(a?.alt ?? ''), caption: honN(a?.caption), credit: m.credit, width: m.width, height: m.height,
+      kind: 'media', id: m.id, src: withToken(m.id), placement: m.placement, afterIndex: m.afterIndex, order: m.orderIndex,
+      variants: Object.keys(m.variants ?? {}).map(Number).sort((x, y) => x - y).map((w) => ({ w, src: withToken(m.id, w) })),
+      alt: hon(a?.alt ?? ''), caption: honN(a?.caption), credit, sourceUrl: m.sourceUrl && /^https:\/\/commons\.wikimedia\.org\//.test(m.sourceUrl) ? m.sourceUrl : null, width: m.width, height: m.height,
     }
   })
 
@@ -247,12 +260,16 @@ export async function getEventPage({ slug, lang, preview = false, previewToken }
     certainty: e.certainty,
     disputeNote: honN(t.disputeNote),
     summary: hon(t.summary),
+    summaryParagraphs: summaryParagraphs(t.summary).map(hon),
+    slotCounts: slotCounts({ summary: t.summary, keyDetails: t.keyDetails, lessons: t.lessons }),
     keyDetails: t.keyDetails.map(hon),
     lessons: t.lessons.map(hon),
     ayat: ayahLinks.map((l) => {
       const a = ayahRows.find((x) => x.id === l.ayahId)
       const tr = ayahTr.find((x) => x.ayahId === l.ayahId)
-      return a ? { ref: `${a.surah}:${a.ayah}`, surah: a.surah, ayah: a.ayah, arabic: a.arabicText, translation: tr?.text ?? null, translationSource: tr ? datasetName.get(tr.translationSource) ?? tr.translationSource : null, translationLicense: tr?.translationLicense ?? null } : null
+      const note = ayahNotes.filter((n) => n.ayahId === l.ayahId)
+      const n = note.find((x) => x.lang === lang) ?? note.find((x) => x.lang === DEFAULT_LANG) ?? note[0]
+      return a ? { kind: 'ayah' as const, placement: l.placement, afterIndex: l.afterIndex, order: l.orderIndex, note: honN(n?.note), ref: `${a.surah}:${a.ayah}`, surah: a.surah, ayah: a.ayah, arabic: a.arabicText, translation: tr?.text ?? null, translationSource: tr ? datasetName.get(tr.translationSource) ?? tr.translationSource : null, translationLicense: tr?.translationLicense ?? null } as AyahView : null
     }).filter((x): x is AyahView => !!x),
     hadith: hadithLinks.map((l) => hadithRows.find((x) => x.id === l.hadithId)).filter((x): x is NonNullable<typeof x> => !!x)
       .map((h) => ({ collection: h.collection, number: h.number, grading: h.grading, gradingBy: h.gradingBy, note: h.note })),
@@ -388,4 +405,27 @@ export async function getPlacesIndex(lang: Lang): Promise<PlaceIndexItem[]> {
     type: p.type as PlaceType, lat: p.lat, lng: p.lng, verified: p.verified,
     events: [...(eventsBy.get(p.id)?.values() ?? [])].sort((a, b) => (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0)),
   }))
+}
+
+// ───────── one-time upload page ─────────
+export interface UploadInfo {
+  ok: true
+  eventTitle: string | null
+  kind: string
+  placement: Placement
+  afterIndex: number | null
+  alt: string
+  expiresAt: string
+}
+
+/** What the upload page may show about a token. Every problem (unknown, used, expired, locked) looks the same: `{ ok: false }`. */
+export async function getUploadInfo(token: string, lang: Lang, now = Date.now()): Promise<UploadInfo | { ok: false }> {
+  if (!/^up_[A-Za-z0-9_-]{20,80}$/.test(token)) return { ok: false }
+  const db = await getDatabase()
+  const row = await db.query.uploadTokens.findFirst({ where: eq(s.uploadTokens.tokenHash, await sha256Hex(token)) })
+  if (!row || row.mode !== 'link' || row.usedAt || Date.parse(row.expiresAt) <= now || row.attempts >= 5) return { ok: false }
+  const tr = row.eventId ? await db.select().from(s.eventTranslations).where(eq(s.eventTranslations.eventId, row.eventId)) : []
+  const t = tr.find((x) => x.lang === lang) ?? tr.find((x) => x.lang === DEFAULT_LANG) ?? tr[0]
+  const alt = row.alt[lang] ?? row.alt[DEFAULT_LANG] ?? Object.values(row.alt)[0] ?? ''
+  return { ok: true, eventTitle: t ? hon(t.title) : null, kind: row.kind, placement: row.placement as Placement, afterIndex: row.afterIndex, alt: hon(alt), expiresAt: row.expiresAt }
 }

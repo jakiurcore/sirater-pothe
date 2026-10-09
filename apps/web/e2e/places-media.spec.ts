@@ -11,23 +11,29 @@ const PUB = '/bn/events/battle-of-badr'
 const DRAFT = `/bn/preview/e2e-media?token=${TOKENS.media}`
 
 const EXPECTED = [
-  'pic:hero', 'summary', 'pic:after_summary',
-  'key:1', 'pic:in_key_details:0', 'key:2', 'key:3', 'pic:in_key_details:2',
-  'pic:before_lessons', 'lessons', 'gallery', 'pic:gallery', 'pic:gallery',
+  'pic:hero',
+  'sum:0', 'pic:in_summary:0', 'ayah:96:1', 'sum:1', 'sum:2',
+  'pic:after_summary',
+  'key:0', 'pic:in_key_details:0', 'ayah:105:1', 'key:1', 'key:2', 'pic:in_key_details:2',
+  'pic:before_lessons',
+  'lesson:0', 'lesson:1', 'pic:in_lessons:1', 'ayah:9:40', 'lesson:2',
+  'pic:end', 'ayah:105:2',
+  'gallery', 'pic:gallery', 'pic:gallery',
 ]
 
-/** The page's landmarks in document order: summary, key details, pictures (with placement), lessons, gallery heading. */
+/** The page's landmarks in document order. Pictures and ayat get `placement[:index]`; the index is the element they follow. */
 async function sequence(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const out: string[] = []
-    for (const el of document.querySelectorAll('article .sum, article .keys > li:not(.keypic), article figure.pic, article .lessons, article .sec > h2')) {
-      if (el.matches('.sum')) out.push('summary')
-      else if (el.matches('.keys > li')) out.push(`key:${[...el.parentElement!.querySelectorAll(':scope > li:not(.keypic)')].indexOf(el) + 1}`)
+    let sum = -1, key = -1, lesson = -1
+    for (const el of document.querySelectorAll('article .sum, article .keys > li:not(.keypic), article .lessons > li:not(.keypic), article figure.pic, article .ayahwrap, article .sec > h2')) {
+      if (el.matches('.sum')) out.push(`sum:${++sum}`)
+      else if (el.matches('.keys > li')) out.push(`key:${++key}`)
+      else if (el.matches('.lessons > li')) out.push(`lesson:${++lesson}`)
       else if (el.matches('figure.pic')) {
         const p = (el as HTMLElement).dataset.placement!
-        const prev = el.closest('li.keypic')?.previousElementSibling
-        out.push(p === 'in_key_details' ? `pic:${p}:${[...el.closest('.keys')!.querySelectorAll(':scope > li:not(.keypic)')].indexOf(prev!)}` : `pic:${p}`)
-      } else if (el.matches('.lessons')) out.push('lessons')
+        out.push(p === 'in_summary' ? `pic:${p}:${sum}` : p === 'in_key_details' ? `pic:${p}:${key}` : p === 'in_lessons' ? `pic:${p}:${lesson}` : `pic:${p}`)
+      } else if (el.matches('.ayahwrap')) out.push(`ayah:${(el as HTMLElement).dataset.ref}`)
       else if (el.matches('h2') && el.parentElement!.querySelector(':scope > .pics.grid')) out.push('gallery')
     }
     return out
@@ -118,6 +124,53 @@ test.describe('media placement on the event page', () => {
   test('an invalid preview token shows no pictures at all', async ({ page }) => {
     await page.goto('/bn/preview/e2e-media?token=nonsense-token-nonsense-token')
     await expect(page.locator('figure.pic')).toHaveCount(0)
+  })
+})
+
+test.describe('ayat in the shared slots', () => {
+  test('ayat and pictures sit in the same slots, in order', async ({ page }) => {
+    await page.goto(PUB)
+    expect(await sequence(page)).toEqual(EXPECTED)
+  })
+  test('the ayah card keeps the design: Arabic right-to-left in Amiri, translation, surah:ayah reference', async ({ page }) => {
+    await page.goto(PUB)
+    const card = page.locator('.ayahwrap[data-ref="105:1"]')
+    await expect(card.locator('.verse .ar')).toHaveAttribute('dir', 'rtl')
+    await expect(card.locator('.verse .ar')).toHaveAttribute('lang', 'ar')
+    expect(await card.locator('.verse .ar').evaluate((e) => getComputedStyle(e).fontFamily)).toMatch(/Amiri/i)
+    await expect(card.locator('.verse figcaption')).toContainText('১০৫:১')
+    expect((await card.locator('.verse .ar').innerText()).length).toBeGreaterThan(5)
+    const box = await card.boundingBox(), vp = page.viewportSize()!
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(vp.width)
+  })
+  test('the placement note is one small line ABOVE the card (and only where there is one)', async ({ page }) => {
+    await page.goto(PUB)
+    const withNote = page.locator('.ayahwrap[data-ref="96:1"]')
+    await expect(withNote.locator('.ayahnote')).toHaveText('এই আয়াতে প্রথম ওহীর উল্লেখ আছে।')
+    const order = await withNote.evaluate((el) => [...el.children].map((c) => c.className))
+    expect(order[0]).toBe('ayahnote')
+    expect(order[1]).toBe('verse')
+    const sizes = await withNote.evaluate((el) => ({ note: parseFloat(getComputedStyle(el.querySelector('.ayahnote')!).fontSize), body: parseFloat(getComputedStyle(el.querySelector('.verse .tr')!).fontSize) }))
+    expect(sizes.note).toBeLessThanOrEqual(13.5)
+    expect(sizes.note).toBeLessThan(sizes.body)
+    await expect(page.locator('.ayahwrap[data-ref="9:40"] .ayahnote')).toHaveCount(0)
+  })
+  test('ayat inside key details and lessons live in the list but are not numbered like items', async ({ page }) => {
+    await page.goto(PUB)
+    await expect(page.locator('.keys > li.keypic .ayahwrap[data-ref="105:1"]')).toHaveCount(1)
+    await expect(page.locator('.lessons > li.keypic .ayahwrap[data-ref="9:40"]')).toHaveCount(1)
+    await expect(page.locator('.keys > li:not(.keypic) > b')).toHaveText(['১', '২', '৩'])
+  })
+  test('preview shows the same ayat placements as the published page', async ({ page }) => {
+    await page.goto(DRAFT)
+    expect(await sequence(page)).toEqual(EXPECTED)
+  })
+  test('nothing overflows with ayat in every slot', async ({ page }) => {
+    await page.goto(PUB)
+    await loadAll(page)
+    const o = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, vw: document.documentElement.clientWidth }))
+    expect(o.sw).toBeLessThanOrEqual(o.vw)
   })
 })
 

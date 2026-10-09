@@ -20,6 +20,8 @@
     }
   ],
   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "f87de7da2ddf46aa95ad7cc9a069974a" }],
-  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "seerah-media" }]
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "seerah-media" }],
+  // Responsive webp copies of uploaded pictures (480/960/1600 px). Optional at runtime: without it only the original is stored.
+  "images": { "binding": "IMAGES" }
   // No secrets: users and password hashes live in D1 (`users`), created with `pnpm user:create`.
 }

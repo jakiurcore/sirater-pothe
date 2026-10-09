@@ -406,3 +406,30 @@ textarea::placeholder{color:var(--ink-2);opacity:.75}
 .eras .hd h2 span,.rates button span,.sum-count{font-family:var(--f-meta)}
 
 .ev .kicker{text-wrap:balance}
+
+/* ayat in the shared slots: one small context line above the card */
+.ayahwrap{display:flex;flex-direction:column;gap:8px;min-width:0}
+.ayahnote{margin:0;padding-inline:4px;font:500 13px/1.7 var(--f-ui);color:var(--ink-2)}
+.keys li.keypic>.pics,.lessons li.keypic>.pics{gap:14px}
+.lessons li.keypic{display:block;margin-inline-start:26px}
+@media (max-width:420px){.lessons li.keypic{margin-inline-start:0}}
+.pic figcaption a{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-decoration:underline;text-underline-offset:3px}
+
+/* ───── one-time upload page: a card in the design's language, not an admin panel ───── */
+.uploadcard{margin:24px 16px 40px;max-width:560px;margin-inline:auto;padding:22px 20px;border-radius:20px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;gap:16px}
+.uploadcard h1{font:700 24px/1.45 var(--f-ui)}
+.uploadcard .lead{font:400 16px/1.8 var(--f-read);color:var(--ink-2)}
+.uploadcard .meta{font:500 13px/1.7 var(--f-ui);color:var(--ink-2)}
+.facts.upl{grid-template-columns:minmax(0,1fr)}
+.upform{display:flex;flex-direction:column;gap:14px}
+.upform .ghostbtn{background:transparent;color:var(--primary-strong);border:1px solid var(--primary)}
+.uppreview{margin:0;display:flex;flex-direction:column;gap:6px}
+.uppreview img{display:block;width:100%;max-height:340px;object-fit:contain;border-radius:14px;border:1px solid var(--line);background:var(--surface-2)}
+.uppreview figcaption{font:500 12.5px/1.6 var(--f-ui);color:var(--ink-2);overflow-wrap:anywhere}
+.upcheck{display:flex;align-items:flex-start;gap:12px;min-height:44px;font:500 15px/1.7 var(--f-ui);cursor:pointer}
+.upcheck input{flex:none;width:24px;height:24px;margin-block-start:3px;accent-color:var(--primary)}
+.upform .btn:disabled{opacity:.45;cursor:not-allowed}
+.uperr{padding:10px 14px;border-radius:14px;background:var(--wrong-tint);color:var(--wrong);font:500 15px/1.6 var(--f-ui)}
+.updone{padding:18px;border-radius:16px;background:var(--primary-tint);color:var(--primary-strong);display:flex;flex-direction:column;gap:4px}
+.updone b{font:700 18px/1.5 var(--f-ui)}
+.updone p{font:400 15px/1.7 var(--f-ui)}

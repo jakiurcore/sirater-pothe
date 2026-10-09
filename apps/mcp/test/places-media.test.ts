@@ -8,7 +8,7 @@ import { imageSize } from '../src/tools/media'
 
 let owner: string, editor: string
 const KD = ['প্রথম বিবরণ', 'দ্বিতীয় বিবরণ', 'তৃতীয় বিবরণ']
-const T = { lang: 'bn', title: 'জমজম কূপ', summary: 'কূপ পুনরুদ্ধারের বিবরণ।', key_details: KD }
+const T = { lang: 'bn', title: 'জমজম কূপ', summary: 'কূপ পুনরুদ্ধারের বিবরণ।\n\nদ্বিতীয় অনুচ্ছেদ: কূপের পানি।', key_details: KD, lessons: ['প্রথম শিক্ষা', 'দ্বিতীয় শিক্ষা'] }
 const mk = (slug: string, title = 'শিরোনাম ' + slug, extra: object = {}) =>
   call(owner, 'create_event_draft', { slug, era_slug: 'makkan-early', translation: { ...T, title }, ...extra })
 const places = async (slug: string) => (await call(owner, 'get_event', { slug })).json.places as { slug: string; role: string; order: number; zoom: number; type: string; parent: string | null }[]
@@ -178,7 +178,7 @@ const png = (w = 8, h = 6) => {
 }
 const b64 = (b: Uint8Array) => btoa(String.fromCharCode(...b))
 const up = (extra: object = {}) => call(owner, 'upload_media', { kind: 'landscape', mime: 'image/png', alt: { bn: 'পাহাড়ের দৃশ্য' }, contains_people_confirmation: false, base64: b64(png(1200, 800)), event_slug: 'ev-media', ...extra })
-const mediaOf = async (slug = 'ev-media') => (await call(owner, 'get_event', { slug })).json.media as { media_id: string; placement: string; after_key_detail_index: number | null; order: number; width: number | null; height: number | null; alt: string; caption: string | null; credit: string | null }[]
+const mediaOf = async (slug = 'ev-media') => (await call(owner, 'get_event', { slug })).json.media as { media_id: string; placement: string; after_index: number | null; order: number; width: number | null; height: number | null; alt: string; caption: string | null; credit: string | null }[]
 
 describe('media placement', () => {
   beforeAll(async () => { await mk('ev-media', 'ছবির ঘটনা') })
@@ -190,21 +190,27 @@ describe('media placement', () => {
     expect(await mediaOf()).toMatchObject([{ placement: 'gallery', width: 1200, height: 800, caption: 'শিরোনাম', credit: 'ছবি: নমুনা (CC BY-SA 4.0)', alt: 'পাহাড়ের দৃশ্য', order: 0 }])
   })
 
-  it('accepts every placement; in_key_details needs an index that exists', async () => {
-    for (const placement of ['hero', 'after_summary', 'before_lessons', 'gallery'])
+  it('accepts every placement; the three in_ placements need an index that exists in THEIR section', async () => {
+    for (const placement of ['hero', 'after_summary', 'before_lessons', 'end', 'gallery'])
       expect((await up({ placement })).isError, placement).toBe(false)
-    expect((await up({ placement: 'in_key_details' })).text).toMatch(/needs after_key_detail_index/)
-    expect((await up({ placement: 'in_key_details', after_key_detail_index: 3 })).text).toMatch(/does not exist: the event has 3 key details \(valid indexes 0–2\)/)
-    expect((await up({ placement: 'in_key_details', after_key_detail_index: 2 })).isError).toBe(false)
-    expect((await up({ placement: 'hero', after_key_detail_index: 0 })).text).toMatch(/only applies to placement "in_key_details"/)
+    expect((await up({ placement: 'in_key_details' })).text).toMatch(/needs after_index/)
+    expect((await up({ placement: 'in_key_details', after_index: 3 })).text).toMatch(/key_details: the event has 3 key details \(valid after_index 0–2\)/)
+    expect((await up({ placement: 'in_key_details', after_index: 2 })).isError).toBe(false)
+    expect((await up({ placement: 'in_summary', after_index: 2 })).text).toMatch(/summary: the event has 2 summary paragraphs \(valid after_index 0–1\)/)
+    expect((await up({ placement: 'in_summary', after_index: 1 })).isError).toBe(false)
+    expect((await up({ placement: 'in_lessons', after_index: 2 })).text).toMatch(/lessons: the event has 2 lessons \(valid after_index 0–1\)/)
+    expect((await up({ placement: 'in_lessons', after_index: 0 })).isError).toBe(false)
+    expect((await up({ placement: 'hero', after_index: 0 })).text).toMatch(/only applies to in_summary, in_key_details and in_lessons/)
     expect((await up({ placement: 'footer' })).text).toMatch(/placement must be one of/)
     const m = await mediaOf()
-    expect(m.find((x) => x.placement === 'in_key_details')).toMatchObject({ after_key_detail_index: 2 })
+    expect(m.find((x) => x.placement === 'in_key_details')).toMatchObject({ after_index: 2 })
+    expect(m.find((x) => x.placement === 'in_summary')).toMatchObject({ after_index: 1 })
   })
 
   it('an event with no key details cannot take an in_key_details picture', async () => {
     await call(owner, 'create_event_draft', { slug: 'ev-nokd', era_slug: 'makkan-early', translation: { lang: 'bn', title: 'বিবরণহীন', summary: 'সারাংশ।' } })
-    expect((await up({ event_slug: 'ev-nokd', placement: 'in_key_details', after_key_detail_index: 0 })).text).toMatch(/no key_details yet/)
+    expect((await up({ event_slug: 'ev-nokd', placement: 'in_key_details', after_index: 0 })).text).toMatch(/no key_details yet/)
+    expect((await up({ event_slug: 'ev-nokd', placement: 'in_lessons', after_index: 0 })).text).toMatch(/no lessons yet/)
   })
 
   it('order within a placement increases by itself and can be set', async () => {
@@ -225,34 +231,41 @@ describe('media placement', () => {
     expect(r.isError).toBe(false)
     expect(r.json.event).toBeNull()
     const id = r.json.media_id
-    expect((await call(owner, 'attach_media', { media_id: id, event_slug: 'ev-media', placement: 'in_key_details', after_key_detail_index: 9 })).text).toMatch(/does not exist/)
-    expect((await call(owner, 'attach_media', { media_id: id, event_slug: 'ev-media', placement: 'in_key_details', after_key_detail_index: 0 })).isError).toBe(false)
+    expect((await call(owner, 'attach_media', { media_id: id, event_slug: 'ev-media', placement: 'in_key_details', after_index: 9 })).text).toMatch(/does not exist/)
+    expect((await call(owner, 'attach_media', { media_id: id, event_slug: 'ev-media', placement: 'in_key_details', after_index: 0 })).isError).toBe(false)
     expect((await call(owner, 'attach_media', { media_id: id, event_slug: 'ev-media' })).text).toMatch(/already attached/)
     expect((await call(owner, 'attach_media', { media_id: 'nonexistent-id', event_slug: 'ev-media' })).text).toMatch(/No picture/)
   })
 
   it('set_media_placement moves a picture, validates the index, clears the index when leaving in_key_details', async () => {
     const m = (await mediaOf()).find((x) => x.placement === 'in_key_details')!
-    expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'in_key_details', after_key_detail_index: 1 })).isError).toBe(false)
-    expect((await mediaOf()).find((x) => x.media_id === m.media_id)!.after_key_detail_index).toBe(1)
-    expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'in_key_details', after_key_detail_index: 3 })).text).toMatch(/valid indexes 0–2/)
-    expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'in_key_details' })).text).toMatch(/needs after_key_detail_index/)
-    expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'before_lessons', after_key_detail_index: 1 })).text).toMatch(/only applies/)
+    expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'in_key_details', after_index: 1 })).isError).toBe(false)
+    expect((await mediaOf()).find((x) => x.media_id === m.media_id)!.after_index).toBe(1)
+    expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'in_key_details', after_index: 3 })).text).toMatch(/valid after_index 0–2/)
+    expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'in_key_details' })).text).toMatch(/needs after_index/)
+    expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'before_lessons', after_index: 1 })).text).toMatch(/only applies/)
     expect((await call(owner, 'set_media_placement', { media_id: m.media_id, placement: 'before_lessons' })).isError).toBe(false)
-    expect((await mediaOf()).find((x) => x.media_id === m.media_id)).toMatchObject({ placement: 'before_lessons', after_key_detail_index: null })
+    expect((await mediaOf()).find((x) => x.media_id === m.media_id)).toMatchObject({ placement: 'before_lessons', after_index: null })
     expect((await call(owner, 'set_media_placement', { media_id: m.media_id })).isError).toBe(true) // placement is required here
   })
 
-  it('shrinking key_details under a placed picture warns on drafts and is refused on published events', async () => {
-    await call(owner, 'set_media_placement', { media_id: (await mediaOf())[0]!.media_id, placement: 'in_key_details', after_key_detail_index: 2 })
+  it('editing text so an index stops existing never breaks the page: it is listed for review, on drafts and on published events', async () => {
+    const id = (await mediaOf())[0]!.media_id
+    await call(owner, 'set_media_placement', { media_id: id, placement: 'in_key_details', after_index: 2 })
     const r = await call(owner, 'update_event', { slug: 'ev-media', translation: { lang: 'bn', key_details: ['একটি'] } })
     expect(r.isError).toBe(false)
-    expect(r.json.warnings[0]).toMatch(/would no longer exist/)
-    expect((await call(owner, 'get_event', { slug: 'ev-media' })).json.publish_blockers.join()).toMatch(/does not exist.*set_media_placement/)
+    expect(r.json.needs_placement_review.some((x: any) => x.id === id && x.section === 'key_details')).toBe(true)
+    const g = (await call(owner, 'get_event', { slug: 'ev-media' })).json
+    expect(g.needs_placement_review.find((x: any) => x.id === id)).toMatchObject({ kind: 'media', placement: 'in_key_details', after_index: 2, section: 'key_details', langs: [{ lang: 'bn', count: 1 }] })
+    expect(g.publish_blockers.join()).not.toMatch(/placement/) // a review item does not block publishing
+    const lay = (await call(owner, 'get_event_layout', { event: 'ev-media' })).json
+    const last = lay.slots.key_details[0].placed_after.find((x: any) => x.media_id === id)
+    expect(last).toMatchObject({ needs_review: true }) // shown at the end of the section
     await call(owner, 'update_event', { slug: 'ev-media', translation: { lang: 'bn', key_details: KD } }) // restore
+    expect((await call(owner, 'get_event', { slug: 'ev-media' })).json.needs_placement_review.some((x: any) => x.id === id)).toBe(false)
   })
 
-  it('published events: editors cannot move pictures, owners can (marked live), publishing is gated by placements', async () => {
+  it('published events: editors cannot move pictures, owners can (marked live)', async () => {
     await call(owner, 'create_source', { slug: 'src-m', book: 'বই', author: 'লেখক' })
     await call(owner, 'add_source_citation', { event_slug: 'ev-media', source_slug: 'src-m', page: '2' })
     await call(owner, 'set_primary_place', { event_slug: 'ev-media', place_slug: 'zamzam' })
@@ -262,7 +275,12 @@ describe('media placement', () => {
     const r = await call(owner, 'set_media_placement', { media_id: id, placement: 'hero' })
     expect(r.isError).toBe(false)
     expect(r.json.live).toMatch(/already live/)
-    expect((await call(owner, 'update_event', { slug: 'ev-media', translation: { lang: 'bn', key_details: ['একটি'] } })).text).toMatch(/Move them first/)
+    // on a published event an edit that orphans a slot is allowed too: the item moves to the end of the section
+    await call(owner, 'set_media_placement', { media_id: id, placement: 'in_key_details', after_index: 2 })
+    const e = await call(owner, 'update_event', { slug: 'ev-media', translation: { lang: 'bn', key_details: ['একটি'] } })
+    expect(e.isError).toBe(false)
+    expect(e.json.needs_placement_review.length).toBeGreaterThan(0)
+    await call(owner, 'update_event', { slug: 'ev-media', translation: { lang: 'bn', key_details: KD } })
   })
 
   it('revert of an upload removes the picture and its file; revert of the draft creation removes everything', async () => {
@@ -301,7 +319,7 @@ describe('media placement', () => {
 })
 
 describe('imageSize', () => {
-  it('reads PNG, JPEG, WebP (VP8X, VP8L, VP8) and AVIF headers; unknown → null', () => {
+  it('reads PNG, JPEG and WebP (VP8X, VP8L, VP8) headers; AVIF and unknown → null', () => {
     expect(imageSize(png(640, 480))).toEqual({ width: 640, height: 480 })
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 17, 8, 0x01, 0xe0, 0x02, 0x80, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1])
     expect(imageSize(jpeg)).toEqual({ width: 640, height: 480 })
@@ -313,7 +331,7 @@ describe('imageSize', () => {
     const vp8 = riff('VP8 ', [0, 0, 0, 0x9d, 0x01, 0x2a, 0x80, 0x02, 0xe0, 0x01, ...new Array(8).fill(0)])
     expect(imageSize(vp8)).toEqual({ width: 640, height: 480 })
     const avif = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66, 0, 0, 0, 0, 0x69, 0x73, 0x70, 0x65, 0, 0, 0, 0, 0, 0, 2, 0x80, 0, 0, 1, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])
-    expect(imageSize(avif)).toEqual({ width: 640, height: 480 })
+    expect(imageSize(avif)).toBeNull() // AVIF is not accepted
     expect(imageSize(new Uint8Array(40))).toBeNull()
     expect(imageSize(new Uint8Array([1, 2, 3]))).toBeNull()
   })

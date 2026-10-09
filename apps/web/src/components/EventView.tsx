@@ -1,29 +1,52 @@
 import Link from 'next/link'
 import { makeFmt, getMessages, hijriLabel, gregLabel, ageLabel, type Lang } from '@/lib/i18n'
-import type { EventPage, MediaItem } from '@/lib/content'
+import { Fragment } from 'react'
+import type { AyahView, EventPage, MediaItem } from '@/lib/content'
+import { groupSlots } from '@/lib/slots'
 import { Icon } from './icons'
 import { MapSync } from './MapStage'
 import { EventEnter, NoteField, ReadButton } from './EventBits'
 
-/** One picture: lazy, with reserved space (no layout shift), alt text, optional caption and credit. */
+/** One picture: lazy, responsive (srcset), with reserved space (no layout shift), alt text, optional caption, credit and source link. */
 function Pic({ m }: { m: MediaItem }) {
+  const srcSet = m.variants.length ? [...m.variants.map((v) => `${v.src} ${v.w}w`), ...(m.width && m.width > m.variants.at(-1)!.w ? [`${m.src} ${m.width}w`] : [])].join(', ') : undefined
   return (
     <figure className="pic" data-placement={m.placement}>
       <div className="frame" style={m.width && m.height ? { aspectRatio: `${m.width} / ${m.height}` } : undefined}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={m.src} alt={m.alt} width={m.width ?? undefined} height={m.height ?? undefined} loading="lazy" decoding="async" />
+        <img src={m.variants.length ? m.variants.find((v) => v.w >= 960)?.src ?? m.src : m.src} srcSet={srcSet} sizes={srcSet ? '(max-width: 720px) calc(100vw - 40px), 680px' : undefined} alt={m.alt} width={m.width ?? undefined} height={m.height ?? undefined} loading="lazy" decoding="async" />
       </div>
       {m.caption || m.credit ? (
         <figcaption>
           {m.caption ? <span>{m.caption}</span> : null}
-          {m.credit ? <small>{m.credit}</small> : null}
+          {m.credit ? <small>{m.sourceUrl ? <a href={m.sourceUrl} target="_blank" rel="noopener noreferrer">{m.credit}</a> : m.credit}</small> : null}
         </figcaption>
       ) : null}
     </figure>
   )
 }
-const Pics = ({ items, className = '' }: { items: MediaItem[]; className?: string }) =>
-  items.length ? <div className={`pics ${className}`.trim()}>{items.map((m) => <Pic key={m.id} m={m} />)}</div> : null
+
+/** An ayah card in the design's style: Arabic (RTL, Amiri), translation, surah:ayah reference, and optionally one small context line above it. */
+function AyahCard({ a, lang, f }: { a: AyahView; lang: Lang; f: ReturnType<typeof makeFmt> }) {
+  return (
+    <div className="ayahwrap" data-placement={a.placement} data-ref={a.ref}>
+      {a.note ? <p className="ayahnote" lang={lang}>{a.note}</p> : null}
+      <figure className="verse">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ stroke: 'var(--gold)', strokeWidth: 1.4 }}><rect x="6" y="6" width="12" height="12" /><rect x="6" y="6" width="12" height="12" transform="rotate(45 12 12)" /></svg>
+        <p className="ar" lang="ar" dir="rtl">{a.arabic}</p>
+        {a.translation ? <p className="tr" lang={lang}>{a.translation}</p> : null}
+        <figcaption>
+          {f.t('ayah.ref', { s: f.n(a.surah), a: f.n(a.ayah) })}
+          {a.translationSource ? <small>{a.translationSource}</small> : null}
+        </figcaption>
+      </figure>
+    </div>
+  )
+}
+
+type Item = AyahView | MediaItem
+const Items = ({ items, lang, f, className = '' }: { items: Item[] | undefined; lang: Lang; f: ReturnType<typeof makeFmt>; className?: string }) =>
+  items?.length ? <div className={`pics ${className}`.trim()}>{items.map((x) => (x.kind === 'ayah' ? <AyahCard key={`a${x.ref}`} a={x} lang={lang} f={f} /> : <Pic key={x.id} m={x} />))}</div> : null
 
 export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang; preview?: { expiresAt: string } }) {
   const f = makeFmt(lang, getMessages(lang))
@@ -40,13 +63,10 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
     ...(have.length ? have : [['when', f.t('event.when'), f.t('event.noDate')] as [string, string, string]]),
     ...(page.placeLabel ? [['place', f.t('event.place'), page.placeLabel] as [string, string, string]] : []),
   ]
-  const hasBody = page.keyDetails.length > 0 || page.lessons.length > 0 || page.sources.length > 0 || page.media.length > 0
-  // Pictures sit exactly where their structured placement says (the same in preview and when published).
-  const at = (p: MediaItem['placement']) => page.media.filter((m) => m.placement === p)
-  const nKeys = page.keyDetails.length
-  // A key-detail index that no longer exists (details were edited) clamps to the last one; with no details at all the picture goes before the lessons.
-  const inKeys = (i: number) => at('in_key_details').filter((m) => nKeys > 0 && Math.min(m.afterKeyDetailIndex ?? 0, nKeys - 1) === i)
-  const beforeLessons = [...(nKeys === 0 ? at('in_key_details') : []), ...at('before_lessons')]
+  const hasBody = page.keyDetails.length > 0 || page.lessons.length > 0 || page.sources.length > 0 || page.media.length > 0 || page.ayat.length > 0
+  // Ayat and pictures share ONE placement model: sort them into the page's slots together (see lib/slots).
+  const slots = groupSlots<Item>([...page.ayat, ...page.media], page.slotCounts)
+  const paras = page.summaryParagraphs.length ? page.summaryParagraphs : [page.summary]
   return (
     <div className="contents">
       <MapSync data={page.map} />
@@ -86,26 +106,19 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
           )}
         </header>
 
-        <Pics items={at('hero')} className="top" />
-
-        {page.ayat.map((a) => (
-          <figure key={a.ref} className="verse">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ stroke: 'var(--gold)', strokeWidth: 1.4 }}><rect x="6" y="6" width="12" height="12" /><rect x="6" y="6" width="12" height="12" transform="rotate(45 12 12)" /></svg>
-            <p className="ar" lang="ar" dir="rtl">{a.arabic}</p>
-            {a.translation ? <p className="tr" lang={lang}>{a.translation}</p> : null}
-            <figcaption>
-              {f.t('ayah.ref', { s: f.n(a.surah), a: f.n(a.ayah) })}
-              {a.translationSource ? <small>{a.translationSource}</small> : null}
-            </figcaption>
-          </figure>
-        ))}
+        <Items items={slots.hero} lang={lang} f={f} className="top" />
 
         <section className="sec">
           <h2>{f.t('event.summary')}</h2>
-          <p className="sum">{page.summary}</p>
+          {paras.map((p, i) => (
+            <Fragment key={i}>
+              <p className="sum">{p}</p>
+              <Items items={slots.inSummary.get(i)} lang={lang} f={f} />
+            </Fragment>
+          ))}
         </section>
 
-        <Pics items={at('after_summary')} />
+        <Items items={slots.afterSummary} lang={lang} f={f} />
 
         {page.keyDetails.length ? (
           <section className="sec">
@@ -113,20 +126,27 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
             <ol className="keys">
               {page.keyDetails.flatMap((k, i) => [
                 <li key={`k${i}`}><b>{f.n(i + 1)}</b><span>{k}</span></li>,
-                ...inKeys(i).map((m) => <li key={m.id} className="keypic"><Pic m={m} /></li>),
+                ...(slots.inKeys.get(i)?.length ? [<li key={`kp${i}`} className="keypic"><Items items={slots.inKeys.get(i)} lang={lang} f={f} /></li>] : []),
               ])}
             </ol>
           </section>
         ) : null}
 
-        <Pics items={beforeLessons} />
+        <Items items={slots.beforeLessons} lang={lang} f={f} />
 
         {page.lessons.length ? (
           <section className="sec">
             <h2>{f.t('event.lessons')}</h2>
-            <ul className="lessons">{page.lessons.map((l, i) => <li key={i}><i aria-hidden="true" /><span>{l}</span></li>)}</ul>
+            <ul className="lessons">
+              {page.lessons.flatMap((l, i) => [
+                <li key={`l${i}`}><i aria-hidden="true" /><span>{l}</span></li>,
+                ...(slots.inLessons.get(i)?.length ? [<li key={`lp${i}`} className="keypic lessonpic"><Items items={slots.inLessons.get(i)} lang={lang} f={f} /></li>] : []),
+              ])}
+            </ul>
           </section>
         ) : null}
+
+        <Items items={slots.end} lang={lang} f={f} />
 
         {page.hadith.length ? (
           <section className="sec">
@@ -156,10 +176,10 @@ export function EventView({ page, lang, preview }: { page: EventPage; lang: Lang
           </section>
         ) : null}
 
-        {at('gallery').length ? (
+        {slots.gallery.length ? (
           <section className="sec">
             <h2>{f.t('event.gallery')}</h2>
-            <Pics items={at('gallery')} className="grid" />
+            <Items items={slots.gallery} lang={lang} f={f} className="grid" />
           </section>
         ) : null}
 

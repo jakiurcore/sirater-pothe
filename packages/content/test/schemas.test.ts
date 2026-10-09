@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   AyahRefSchema, HadithRefSchema, UploadMediaSchema, CreateRouteSchema, CreatePlaceSchema, CreateEventDraftSchema,
-  RecallQuestionSchema, CitationSchema, publishBlockers, placementProblem, placeZoom, effectiveZoom, maxZoomAt, DEFAULT_ZOOM, PlaceTypeSchema, addHonorific, missingHonorific, HijriYearSchema, GAZETTEER_SEED, inArabiaBBox,
+  RecallQuestionSchema, CitationSchema, publishBlockers, placementProblem, placementNeedsReview, summaryParagraphs, slotCounts, slotSort, PLACEMENTS, ALLOWED_MEDIA_MIME, MAX_MEDIA_BYTES, placeZoom, effectiveZoom, maxZoomAt, DEFAULT_ZOOM, PlaceTypeSchema, addHonorific, missingHonorific, HijriYearSchema, GAZETTEER_SEED, inArabiaBBox,
 } from '../src'
 
 const msgs = (r: { success: boolean; error?: { issues: { message: string }[] } }) => r.error?.issues.map((i) => i.message).join(' | ') ?? ''
@@ -39,7 +39,7 @@ describe('no people imagery', () => {
   it('rejects people confirmation, svg and oversize', () => {
     expect(UploadMediaSchema.safeParse({ ...base, kind: 'map', contains_people_confirmation: true }).success).toBe(false)
     expect(UploadMediaSchema.safeParse({ ...base, kind: 'map', mime: 'image/svg+xml' }).success).toBe(false)
-    expect(UploadMediaSchema.safeParse({ ...base, kind: 'map', base64: 'A'.repeat(8_000_000) }).success).toBe(false)
+    expect(UploadMediaSchema.safeParse({ ...base, kind: 'map', base64: 'A'.repeat(14_000_000) }).success).toBe(false)
   })
   it('requires alt text', () => expect(UploadMediaSchema.safeParse({ ...base, kind: 'map', alt: {} }).success).toBe(false))
 })
@@ -141,11 +141,6 @@ describe('publishBlockers', () => {
     expect(publishBlockers({ ...ok, primaryPlaceCount: 0 })[0]).toMatch(/No primary place/)
     expect(publishBlockers({ ...ok, primaryPlaceCount: 2 })[0]).toMatch(/2 primary places/)
   })
-  it('blocks a picture whose key-detail index no longer exists', () => {
-    const media = [{ id: 'm1', placement: 'in_key_details' as const, after_key_detail_index: 3 }]
-    expect(publishBlockers({ ...ok, keyDetailCount: 2, media })[0]).toMatch(/does not exist.*valid indexes 0–1/)
-    expect(publishBlockers({ ...ok, keyDetailCount: 4, media })).toEqual([])
-  })
   it('disputed requires note', () => expect(publishBlockers({ ...ok, certainty: 'disputed' })[0]).toMatch(/dispute_note/))
 })
 
@@ -193,25 +188,59 @@ describe('place types and zoom', () => {
   })
 })
 
-describe('media placement', () => {
-  const up = { kind: 'landscape', mime: 'image/png', alt: { bn: 'পাহাড়ের দৃশ্য' }, contains_people_confirmation: false, base64: 'AAAA' }
-  it('defaults to gallery', () => {
+describe('shared placement model (pictures and ayat)', () => {
+  const up = { kind: 'landscape', alt: { bn: 'পাহাড়ের দৃশ্য' }, contains_people_confirmation: false, base64: 'AAAA' }
+  const counts = { summary: 3, keyDetails: 4, lessons: 2 }
+  it('has the eight placements; gallery is for pictures only', () => {
+    expect([...PLACEMENTS]).toEqual(['hero', 'in_summary', 'after_summary', 'in_key_details', 'in_lessons', 'before_lessons', 'end', 'gallery'])
+    expect(placementProblem({ placement: 'gallery' }, 'media')).toBeNull()
+    expect(placementProblem({ placement: 'gallery' }, 'ayah')).toMatch(/pictures only/)
+  })
+  it('pictures default to gallery', () => {
     const r = UploadMediaSchema.safeParse(up)
     expect(r.success && r.data.placement).toBe('gallery')
   })
-  it('in_key_details needs an index; other placements reject one', () => {
-    expect(msgs(UploadMediaSchema.safeParse({ ...up, placement: 'in_key_details' }))).toMatch(/needs after_key_detail_index/)
-    expect(UploadMediaSchema.safeParse({ ...up, placement: 'in_key_details', after_key_detail_index: 0 }).success).toBe(true)
-    expect(msgs(UploadMediaSchema.safeParse({ ...up, placement: 'hero', after_key_detail_index: 1 }))).toMatch(/only applies to placement "in_key_details"/)
+  it('in_summary, in_key_details and in_lessons need after_index; other placements reject one', () => {
+    for (const p of ['in_summary', 'in_key_details', 'in_lessons']) {
+      expect(placementProblem({ placement: p as never }, 'media')).toMatch(/needs after_index/)
+      expect(placementProblem({ placement: p as never, after_index: 0 }, 'media')).toBeNull()
+    }
+    for (const p of ['hero', 'after_summary', 'before_lessons', 'end', 'gallery']) expect(placementProblem({ placement: p as never, after_index: 1 }, 'media'), p).toMatch(/only applies to in_summary, in_key_details and in_lessons/)
+    expect(msgs(UploadMediaSchema.safeParse({ ...up, placement: 'in_key_details' }))).toMatch(/needs after_index/)
+    expect(UploadMediaSchema.safeParse({ ...up, placement: 'in_lessons', after_index: 0 }).success).toBe(true)
   })
   it('unknown placements are rejected with the list of valid ones', () => {
-    expect(msgs(UploadMediaSchema.safeParse({ ...up, placement: 'footer' }))).toMatch(/hero, after_summary, in_key_details, before_lessons, gallery/)
+    expect(msgs(UploadMediaSchema.safeParse({ ...up, placement: 'footer' }))).toMatch(/hero, in_summary, after_summary, in_key_details, in_lessons, before_lessons, end, gallery/)
   })
-  it('index must exist in the key details', () => {
-    expect(placementProblem({ placement: 'in_key_details', after_key_detail_index: 2 }, 3)).toBeNull()
-    expect(placementProblem({ placement: 'in_key_details', after_key_detail_index: 3 }, 3)).toMatch(/valid indexes 0–2/)
-    expect(placementProblem({ placement: 'in_key_details', after_key_detail_index: 0 }, 0)).toMatch(/no key_details yet/)
-    expect(placementProblem({ placement: 'gallery' }, 0)).toBeNull()
+  it('the index must exist in the text of that section, and the message gives the valid range', () => {
+    expect(placementProblem({ placement: 'in_summary', after_index: 2 }, 'ayah', counts)).toBeNull()
+    expect(placementProblem({ placement: 'in_summary', after_index: 3 }, 'ayah', counts)).toMatch(/summary: the event has 3 summary paragraphs \(valid after_index 0–2\)/)
+    expect(placementProblem({ placement: 'in_key_details', after_index: 4 }, 'media', counts)).toMatch(/key_details: the event has 4 key details \(valid after_index 0–3\)/)
+    expect(placementProblem({ placement: 'in_lessons', after_index: 2 }, 'media', counts)).toMatch(/lessons: the event has 2 lessons \(valid after_index 0–1\)/)
+    expect(placementProblem({ placement: 'in_lessons', after_index: 0 }, 'media', { ...counts, lessons: 0 })).toMatch(/no lessons yet/)
+    expect(placementProblem({ placement: 'in_key_details', after_index: -1 }, 'media', counts)).toMatch(/whole number/)
+  })
+  it('an index that stopped existing is flagged for review (not an error)', () => {
+    expect(placementNeedsReview({ placement: 'in_key_details', after_index: 3 }, counts)).toBeNull()
+    expect(placementNeedsReview({ placement: 'in_key_details', after_index: 4 }, counts)).toEqual({ section: 'key_details', count: 4, after_index: 4 })
+    expect(placementNeedsReview({ placement: 'in_summary', after_index: 5 }, { ...counts, summary: 1 })).toEqual({ section: 'summary', count: 1, after_index: 5 })
+    expect(placementNeedsReview({ placement: 'hero', after_index: null }, counts)).toBeNull()
+  })
+  it('summaries are paragraphs split on blank lines, backward compatible with a single string', () => {
+    expect(summaryParagraphs('one line only')).toEqual(['one line only'])
+    expect(summaryParagraphs('A\n\nB\r\n\r\n  \nC\nstill C')).toEqual(['A', 'B', 'C\nstill C'])
+    expect(summaryParagraphs('')).toEqual([])
+    expect(slotCounts({ summary: 'A\n\nB', keyDetails: ['x'], lessons: [] })).toEqual({ summary: 2, keyDetails: 1, lessons: 0 })
+  })
+  it('ayat and pictures sort together by order; at equal order pictures come first', () => {
+    const items = [{ id: 'a1', kind: 'ayah' as const, order: 1 }, { id: 'm1', kind: 'media' as const, order: 1 }, { id: 'a0', kind: 'ayah' as const, order: 0 }, { id: 'm2', kind: 'media' as const, order: 2 }]
+    expect(items.sort(slotSort).map((i) => i.id)).toEqual(['a0', 'm1', 'a1', 'm2'])
+  })
+  it('only png / jpeg / webp, up to 10 MB', () => {
+    expect([...ALLOWED_MEDIA_MIME]).toEqual(['image/png', 'image/jpeg', 'image/webp'])
+    expect(MAX_MEDIA_BYTES).toBe(10 * 1024 * 1024)
+    expect(UploadMediaSchema.safeParse({ ...up, mime: 'image/avif' }).success).toBe(false)
+    expect(UploadMediaSchema.safeParse({ ...up, mime: 'image/svg+xml' }).success).toBe(false)
   })
   it('the no-people rules are unchanged', () => {
     expect(UploadMediaSchema.safeParse({ ...up, kind: 'portrait' }).success).toBe(false)

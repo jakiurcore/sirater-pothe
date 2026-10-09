@@ -134,6 +134,62 @@ describe('migration: event_places + place types + Zamzam event', () => {
   })
   it('new media columns default sensibly', () => {
     d.exec("insert into media(id,r2_key,kind,mime,bytes) values('m1','k','landscape','image/png',1)")
-    expect(q("select placement, after_key_detail_index a, order_index o, credit, width from media where id='m1'")[0]).toEqual({ placement: 'gallery', a: null, o: 0, credit: null, width: null })
+    expect(q("select placement, after_index a, order_index o, credit, width from media where id='m1'")[0]).toEqual({ placement: 'gallery', a: null, o: 0, credit: null, width: null })
+  })
+})
+
+// ───────────── shared placement model: ayat + media ─────────────
+describe('migration: placement for ayat, after_index for media, upload tables', () => {
+  let d: DatabaseSync
+  const q = (sql: string) => d.prepare(sql).all() as Record<string, unknown>[]
+  const upTo = (n: number) => files().filter((f) => Number(f.slice(0, 4)) <= n)
+  const from = (n: number) => files().filter((f) => Number(f.slice(0, 4)) >= n)
+  beforeAll(() => {
+    d = new DatabaseSync(':memory:')
+    d.exec('PRAGMA foreign_keys = ON')
+    apply(d, upTo(4)) // production before this change
+    d.exec(`
+      insert into eras(id,slug,order_index) values('e1','era',1);
+      insert into events(id,slug,era_id,order_index) values('v1','one','e1',1),('v2','two','e1',2);
+      insert into ayat(id,surah,ayah,arabic_text,arabic_source) values('96:1',96,1,'x','s'),('96:2',96,2,'x','s'),('105:1',105,1,'x','s');
+      insert into event_ayat(event_id,ayah_id,order_index) values('v1','96:1',0),('v1','96:2',1),('v2','105:1',0);
+      insert into media(id,r2_key,kind,mime,bytes,event_id,placement,after_key_detail_index,order_index) values
+        ('m-key','k1','landscape','image/png',1,'v1','in_key_details',2,0),
+        ('m-hero','k2','landscape','image/png',1,'v1','hero',NULL,0),
+        ('m-gal','k3','map','image/png',1,'v2','gallery',NULL,3);
+    `)
+    apply(d, from(5))
+  })
+  it('existing ayat keep their look: hero slot, ordered after any picture, relative order kept', () => {
+    expect(q("select ayah_id a, placement p, after_index i, order_index o from event_ayat where event_id='v1' order by o")).toEqual([
+      { a: '96:1', p: 'hero', i: null, o: 1000 }, { a: '96:2', p: 'hero', i: null, o: 1001 },
+    ])
+    expect(q("select placement p, order_index o from event_ayat where event_id='v2'")).toEqual([{ p: 'hero', o: 1000 }])
+  })
+  it('pictures keep their position: after_key_detail_index became after_index, the old column is gone', () => {
+    expect(q("select id, placement p, after_index i, order_index o from media order by id")).toEqual([
+      { id: 'm-gal', p: 'gallery', i: null, o: 3 }, { id: 'm-hero', p: 'hero', i: null, o: 0 }, { id: 'm-key', p: 'in_key_details', i: 2, o: 0 },
+    ])
+    expect(q("select name from pragma_table_info('media')").map((r) => r.name)).not.toContain('after_key_detail_index')
+    expect(q("select name from pragma_table_info('media')").map((r) => r.name)).toEqual(expect.arrayContaining(['after_index', 'license', 'author', 'source_url', 'variants', 'sha256']))
+  })
+  it('creates the note, token and session tables; notes cascade with their event', () => {
+    d.exec("insert into event_ayat_notes(event_id,ayah_id,lang,note) values('v1','96:1','bn','এই আয়াতে প্রথম ওহী')")
+    expect(() => d.exec("insert into event_ayat_notes(event_id,ayah_id,lang,note) values('v1','96:1','bn','x')")).toThrow(/UNIQUE|PRIMARY/)
+    d.exec("insert into upload_tokens(token_hash,mode,created_by,kind,placement,alt,expires_at) values('h','put','onset','map','gallery','{}','2099-01-01')")
+    expect(q("select attempts a, used_at u from upload_tokens")).toEqual([{ a: 0, u: null }])
+    d.exec("insert into upload_sessions(id,created_by,total_size,sha256,chunk_size,meta,expires_at) values('s1','onset',10,'x',32768,'{}','2099-01-01')")
+    d.exec("delete from events where id='v1'")
+    expect(q("select count(*) c from event_ayat_notes")[0]!.c).toBe(0)
+  })
+  it('the data migration can run again without changing anything', () => {
+    const snap = () => JSON.stringify([q('select * from event_ayat order by 1,2'), q('select id,placement,after_index,order_index from media order by 1')])
+    const before = snap()
+    d.exec(readFileSync(join(dir, files().find((f) => f.startsWith('0006'))!), 'utf8').split('--> statement-breakpoint')[1]!) // the ayat step
+    expect(snap()).toBe(before)
+  })
+  it('a fresh database migrates cleanly through every step', () => {
+    const f = new DatabaseSync(':memory:')
+    expect(() => apply(f, files())).not.toThrow()
   })
 })

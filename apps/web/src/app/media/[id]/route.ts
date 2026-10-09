@@ -21,10 +21,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const published = ev.status === 'published'
   if (!published && !(await verifyPreviewToken(ev.slug, new URL(req.url).searchParams.get('token') ?? undefined)).ok) return notFound()
   const env = await getEnv()
-  const obj = await env.MEDIA.get(row.r2Key)
+  // ?w=480|960|1600 → the responsive webp copy when it exists (else the original, so a missing size never breaks a page)
+  const w = new URL(req.url).searchParams.get('w')
+  const variantKey = w && /^\d{3,4}$/.test(w) ? row.variants?.[w] : undefined
+  const obj = (variantKey ? await env.MEDIA.get(variantKey) : null) ?? (await env.MEDIA.get(row.r2Key))
   if (!obj) return notFound()
+  const isVariant = !!variantKey && obj.key === variantKey
   const headers = new Headers({
-    'Content-Type': row.mime,
+    'Content-Type': isVariant ? 'image/webp' : row.mime,
     'Content-Length': String(obj.size),
     'Cache-Control': published ? 'public, max-age=3600, stale-while-revalidate=86400' : 'private, no-store',
     'Content-Disposition': 'inline',

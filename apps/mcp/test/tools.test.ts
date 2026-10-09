@@ -145,7 +145,7 @@ describe('places, routes, media', () => {
     expect((await call(owner, 'create_route', { slug: 'hijrah', names: { bn: 'হিজরত' }, geojson: { type: 'LineString', coordinates: [[39.826, 21.42], [39.61, 24.47]] } })).isError).toBe(false)
     expect((await call(owner, 'update_event', { slug: 'editor-draft', patch: { place_slug: 'makkah', route_slug: 'hijrah' } })).isError).toBe(false)
   })
-  const png = btoa(String.fromCharCode(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0))
+  const png = btoa(String.fromCharCode(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 8, 0, 0, 0, 6, 8, 2, 0, 0, 0, 0, 0, 0, 0)) // header of an 8×6 PNG
   const media = { mime: 'image/png', alt: { bn: 'হেরা পর্বতের দৃশ্য' }, contains_people_confirmation: false, base64: png }
   it('accepts allowed kinds and rejects people-ish kinds, svg, mismatched content', async () => {
     expect((await call(owner, 'upload_media', { ...media, kind: 'landscape', event_slug: 'editor-draft' })).isError).toBe(false)

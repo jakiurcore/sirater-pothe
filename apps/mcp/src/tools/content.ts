@@ -3,11 +3,12 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { McpServer } from '@modelcontextprotocol/server'
 import { schema as s } from '@seerah/db'
 import {
-  ARABIC_DATASET, CitationSchema, HadithRefSchema, LangSchema, RecallItemSchema, SlugSchema, SourceSchema, DEFAULT_LANG,
+  ARABIC_DATASET, AyahPlacementFields, addHonorific, CitationSchema, HadithRefSchema, LangSchema, RecallItemSchema, SlugSchema, SourceSchema, DEFAULT_LANG,
   checkRef, formatRef, getAyat, getTranslationMeta, availableTranslationLangs,
 } from '@seerah/content'
 import { assertCanEdit, defineTool, type ToolCtx } from './kit'
-import { eventBySlug, sourceBySlug, touch, withRevision } from '../data'
+import { eventBySlug, sourceBySlug, touch, withRevision, loadEventAggregate } from '../data'
+import { assertSlot, nextSlotOrder } from '../media/ingest'
 import { ToolError, uuid } from '../util'
 
 const noQuranText = (iss: { code: string }) =>
@@ -15,13 +16,22 @@ const noQuranText = (iss: { code: string }) =>
     ? "Qur'an text is never accepted from the client. Send only event_slug, surah, ayah (and optional ayahTo, lang); the server fills the Arabic and translation from verified datasets."
     : undefined
 
+/** One short sentence per language, shown small above the ayah card (why it is here). Never Qur'an text. */
+const NoteSchema = z.partialRecord(LangSchema, z.string().trim().min(3).max(200)).describe('Optional: ONE short sentence per language, in correct standard form of that language, saying why this ayah is in this spot (e.g. "এই আয়াতে ইবরাহিম (আ.)-এর দোয়ার উল্লেখ আছে"). For a range it is shown above the first ayah. Never write Qur\'an text here.')
+const noteRows = (eventId: string, ayahId: string, note: Record<string, string | undefined> | undefined) =>
+  Object.entries(note ?? {}).filter(([, t]) => !!t).map(([lang, t]) => ({ eventId, ayahId, lang, note: addHonorific(t!) }))
+
 const AttachAyahInput = z.strictObject({
   event_slug: SlugSchema,
   surah: z.number().int().describe('1-114'),
   ayah: z.number().int().describe('first ayah'),
   ayahTo: z.number().int().optional().describe('last ayah of a range in the same surah (max 20 ayat)'),
   lang: LangSchema.default('bn').describe('Language of the translation to fetch (bundled: ' + availableTranslationLangs().join(', ') + ').'),
+  ...AyahPlacementFields,
+  placement_note: NoteSchema.optional(),
 }, { error: noQuranText })
+
+const INDEXED = ['in_summary', 'in_key_details', 'in_lessons']
 
 const DetachAyahInput = z.strictObject({
   event_slug: SlugSchema, surah: z.number().int(), ayah: z.number().int(), ayahTo: z.number().int().optional(),
@@ -32,7 +42,7 @@ export function registerContentTools(server: McpServer, ctx: ToolCtx) {
 
   defineTool(server, ctx, 'attach_ayah', {
     title: 'Attach ayah (reference only)',
-    description: "Attach Qur'an ayat to an event BY REFERENCE. The server validates surah:ayah against the 114-surah table and fills in the Arabic (Tanzil Uthmani) and translation itself. Returns the fetched text: SHOW IT TO THE OWNER and ask them to confirm it fits the event before continuing; use detach_ayah if not. Never send Arabic text yourself.",
+    description: "Attach Qur'an ayat to an event BY REFERENCE, at a placement in the page (default after_summary). BEFORE choosing the placement call get_event_layout and pick the paragraph, key detail or lesson the ayah directly supports; explain the choice to the owner. Placements: hero | in_summary (after summary paragraph N) | after_summary | in_key_details (after key detail N) | in_lessons (after lesson N) | before_lessons | end; after_index is 0-based and must exist. The server validates surah:ayah against the 114-surah table and fills in the Arabic (Tanzil Uthmani) and translation itself. Returns the fetched text: SHOW IT TO THE OWNER and ask them to confirm it fits the event before continuing; use detach_ayah if not. Never send Arabic text yourself.",
     access: 'write',
     input: AttachAyahInput,
   }, async (a) => {
@@ -40,6 +50,8 @@ export function registerContentTools(server: McpServer, ctx: ToolCtx) {
     if (!c.ok) throw new ToolError(c.error)
     const ev = await eventBySlug(db, a.event_slug)
     assertCanEdit(ctx, ev.status)
+    const agg = (await loadEventAggregate(db, ev.id))!
+    assertSlot(agg, 'ayah', { placement: a.placement, after_index: a.after_index })
     const texts = getAyat(c.ref, a.lang)
     const meta = getTranslationMeta(a.lang)
     const existing = await db.select({ ayahId: s.eventAyat.ayahId }).from(s.eventAyat).where(eq(s.eventAyat.eventId, ev.id))
@@ -57,13 +69,18 @@ export function registerContentTools(server: McpServer, ctx: ToolCtx) {
                 .onConflictDoUpdate({ target: [s.ayahTranslations.ayahId, s.ayahTranslations.lang], set: { text: t.translation, translationSource: meta.id, translationLicense: meta.license } })]
             : []),
         ]),
-        ...fresh.map((t, i) => db.insert(s.eventAyat).values({ eventId: ev.id, ayahId: `${t.surah}:${t.ayah}`, orderIndex: have.size + i })),
+        ...fresh.map((t, i) => db.insert(s.eventAyat).values({
+          eventId: ev.id, ayahId: `${t.surah}:${t.ayah}`, placement: a.placement, afterIndex: INDEXED.includes(a.placement) ? a.after_index! : null,
+          orderIndex: a.order !== undefined ? a.order + i : nextSlotOrder(agg, a.placement, INDEXED.includes(a.placement) ? a.after_index! : null) + i,
+        })),
+        ...(fresh.length ? noteRows(ev.id, `${fresh[0]!.surah}:${fresh[0]!.ayah}`, a.placement_note).map((r) => db.insert(s.eventAyatNotes).values(r).onConflictDoUpdate({ target: [s.eventAyatNotes.eventId, s.eventAyatNotes.ayahId, s.eventAyatNotes.lang], set: { note: r.note } })) : []),
         touch(db, ev.id),
       ],
     })
     return {
       ok: true, event: a.event_slug, ref: formatRef(c.ref), revision_id: revisionId,
-      already_attached: texts.length - fresh.length || undefined,
+      already_attached: texts.length - fresh.length ? `${texts.length - fresh.length} already attached (use set_ayah_placement to move them)` : undefined,
+      placement: { placement: a.placement, after_index: INDEXED.includes(a.placement) ? a.after_index : null },
       requires_owner_confirmation: true,
       instruction: 'Show this text to the owner and ask them to confirm. If it is the wrong passage, call detach_ayah.',
       ayat: texts.map((t) => ({ ref: `${t.surah}:${t.ayah}`, arabic: t.arabic, translation: t.translation ?? null })),
@@ -85,9 +102,44 @@ export function registerContentTools(server: McpServer, ctx: ToolCtx) {
     if (!linked.length) throw new ToolError(`${formatRef(c.ref)} is not attached to "${a.event_slug}".`)
     const { revisionId } = await withRevision(db, actor, {
       entity: 'event', entityId: ev.id, action: 'detach_ayah',
-      build: () => [db.delete(s.eventAyat).where(and(eq(s.eventAyat.eventId, ev.id), inArray(s.eventAyat.ayahId, ids))), touch(db, ev.id)],
+      build: () => [db.delete(s.eventAyatNotes).where(and(eq(s.eventAyatNotes.eventId, ev.id), inArray(s.eventAyatNotes.ayahId, ids))), db.delete(s.eventAyat).where(and(eq(s.eventAyat.eventId, ev.id), inArray(s.eventAyat.ayahId, ids))), touch(db, ev.id)],
     })
     return { ok: true, detached: linked.map((l) => l.id), revision_id: revisionId }
+  })
+
+  defineTool(server, ctx, 'set_ayah_placement', {
+    title: 'Set ayah placement',
+    description: "Move ayat that are already attached to an event: ayah_ref is 'surah:ayah' (e.g. '96:1') or a range ('96:1-5'). placement: hero | in_summary | after_summary | in_key_details | in_lessons | before_lessons | end; after_index (0-based, must exist; see get_event_layout) is required for the three in_ placements. order sorts everything that shares the slot (ayat and pictures). placement_note replaces the one-sentence context line shown above the first ayah (pass null to remove it). Qur'an text is never accepted.",
+    access: 'write',
+    input: z.strictObject({
+      event_slug: SlugSchema,
+      ayah_ref: z.string().regex(/^\d{1,3}:\d{1,3}(-\d{1,3})?$/, "ayah_ref looks like '96:1' or '96:1-5'"),
+      ...AyahPlacementFields, placement: AyahPlacementFields.placement.unwrap(),
+      placement_note: NoteSchema.nullable().optional(),
+    }, { error: noQuranText }),
+  }, async (a) => {
+    const m = /^(\d+):(\d+)(?:-(\d+))?$/.exec(a.ayah_ref)!
+    const c = checkRef({ surah: +m[1]!, ayah: +m[2]!, ayahTo: m[3] ? +m[3] : undefined })
+    if (!c.ok) throw new ToolError(c.error)
+    const ev = await eventBySlug(db, a.event_slug)
+    assertCanEdit(ctx, ev.status)
+    const agg = (await loadEventAggregate(db, ev.id))!
+    const ids = Array.from({ length: c.ref.ayahTo - c.ref.ayah + 1 }, (_, i) => `${c.ref.surah}:${c.ref.ayah + i}`)
+    const missing = ids.filter((id) => !agg.ayat.some((x) => x.ayahId === id))
+    if (missing.length) throw new ToolError(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not attached to "${a.event_slug}". Attach with attach_ayah first (it takes the placement too).`)
+    assertSlot(agg, 'ayah', { placement: a.placement, after_index: a.after_index })
+    const idx = INDEXED.includes(a.placement) ? a.after_index! : null
+    const base = a.order ?? nextSlotOrder(agg, a.placement, idx, undefined)
+    const { revisionId } = await withRevision(db, actor, {
+      entity: 'event', entityId: ev.id, action: 'set_ayah_placement',
+      build: () => [
+        ...ids.map((id, i) => db.update(s.eventAyat).set({ placement: a.placement, afterIndex: idx, orderIndex: base + i }).where(and(eq(s.eventAyat.eventId, ev.id), eq(s.eventAyat.ayahId, id)))),
+        ...(a.placement_note !== undefined ? [db.delete(s.eventAyatNotes).where(and(eq(s.eventAyatNotes.eventId, ev.id), eq(s.eventAyatNotes.ayahId, ids[0]!)))] : []),
+        ...(a.placement_note ? noteRows(ev.id, ids[0]!, a.placement_note).map((r) => db.insert(s.eventAyatNotes).values(r)) : []),
+        touch(db, ev.id),
+      ],
+    })
+    return { ok: true, event: a.event_slug, ayat: ids, placement: a.placement, after_index: idx, revision_id: revisionId, live: ev.status === 'published' ? 'WARNING: this event is published, so the change is already live.' : undefined }
   })
 
   defineTool(server, ctx, 'attach_hadith_ref', {

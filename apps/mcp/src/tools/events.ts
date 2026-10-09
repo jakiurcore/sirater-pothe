@@ -7,7 +7,7 @@ import {
   UpdateEventTranslationSchema, DEFAULT_LANG, addHonorific,
 } from '@seerah/content'
 import { assertCanEdit, defineTool, type ToolCtx } from './kit'
-import { blockersFor, eraBySlug, eventBySlug, linksOf, loadEventAggregate, maxOrder, placeBySlug, placeLinkStatements, planRemovePlace, planSetPrimary, routeBySlug, touch, withRevision, titles } from '../data'
+import { blockersFor, placementReview, eraBySlug, eventBySlug, linksOf, loadEventAggregate, maxOrder, placeBySlug, placeLinkStatements, planRemovePlace, planSetPrimary, routeBySlug, touch, withRevision, titles } from '../data'
 import { ToolError, nowIso, randomToken, sha256Hex, uuid } from '../util'
 
 const GAP = 1024
@@ -96,8 +96,7 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
     }
     // Places: patch.place_slug sets (or, with null, clears) the primary place through event_places.
     let placeStmts: ReturnType<typeof placeLinkStatements> = []
-    let warnings: string[] | undefined
-    const agg = (patch?.place_slug !== undefined || tSet?.keyDetails !== undefined) ? (await loadEventAggregate(db, ev.id))! : null
+    const agg = patch?.place_slug !== undefined ? (await loadEventAggregate(db, ev.id))! : null
     if (patch?.place_slug !== undefined && agg) {
       const links = linksOf(agg)
       const primary = links.find((l) => l.role === 'primary')
@@ -105,16 +104,6 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
         ? (primary ? planRemovePlace(links, primary.placeId, ev.status) : links)
         : planSetPrimary(links, (await placeBySlug(db, patch.place_slug)).id)
       placeStmts = placeLinkStatements(db, ev.id, next)
-    }
-    // Shrinking the default-language key_details can strand a picture placed "after detail N".
-    if (tSet?.keyDetails !== undefined && agg && translation!.lang === DEFAULT_LANG) {
-      const n = tSet.keyDetails.length
-      const stranded = agg.media.filter((m) => m.media.placement === 'in_key_details' && (m.media.afterKeyDetailIndex ?? 0) >= n)
-      if (stranded.length) {
-        const msg = `${stranded.length} picture(s) are placed after key detail ${stranded.map((m) => m.media.afterKeyDetailIndex).join(', ')} which would no longer exist with ${n} key details. Move them first with set_media_placement.`
-        if (ev.status === 'published') throw new ToolError(msg)
-        warnings = [msg]
-      }
     }
     const { revisionId } = await withRevision(db, actor, {
       entity: 'event', entityId: ev.id, action: 'update',
@@ -124,7 +113,10 @@ export function registerEventTools(server: McpServer, ctx: ToolCtx) {
         ...(tSet ? [db.update(s.eventTranslations).set(tSet).where(and(eq(s.eventTranslations.eventId, ev.id), eq(s.eventTranslations.lang, translation!.lang)))] : []),
       ],
     })
-    return { ok: true, slug, revision_id: revisionId, warnings, live: ev.status === 'published' ? 'WARNING: this event is published, so the change is already live. revert_revision undoes it.' : undefined }
+    // Editing the summary / key details / lessons can leave an ayah or picture pointing at a slot that no longer exists:
+    // the page then shows it at the end of that section and it is listed here (and in get_event) for re-placement.
+    const review = translation ? placementReview((await loadEventAggregate(db, ev.id))!) : []
+    return { ok: true, slug, revision_id: revisionId, needs_placement_review: review.length ? review : undefined, live: ev.status === 'published' ? 'WARNING: this event is published, so the change is already live. revert_revision undoes it.' : undefined }
   })
 
   defineTool(server, ctx, 'set_event_order', {

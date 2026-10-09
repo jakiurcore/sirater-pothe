@@ -2,6 +2,7 @@ import { AuthorizationError, CimdFetchError } from '@cloudflare/workers-oauth-pr
 import type { Env } from '../env'
 import { GET_LIMIT, POST_LIMIT, attemptLogin, audit, clientKey, csrfCookie, csrfValid, newCsrf, normalizeUsername, rateLimit, CSRF_COOKIE } from './guard'
 import { esc, layout, loginPage } from './page'
+import { handleUpload } from '../media/uploads'
 
 const GENERIC = 'ব্যবহারকারীর নাম, পাসওয়ার্ড বা কোড সঠিক নয়। / Incorrect username, password or code.'
 
@@ -84,6 +85,10 @@ export const defaultHandler = {
         headers.set('Location', redirectTo)
         return new Response(null, { status: 302, headers })
       }
+
+      // Single-use signed upload URLs (create_upload_url / the site's upload page). The token in the path is the credential.
+      const up = /^\/upload\/(up_[A-Za-z0-9_-]{20,80})$/.exec(url.pathname)
+      if (up) return handleUpload(request, env, up[1]!)
 
       if (url.pathname === '/' || url.pathname === '/health')
         return new Response(url.pathname === '/health' ? 'ok' : 'Seerah Timeline MCP server. Connect an MCP client to /mcp.', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })

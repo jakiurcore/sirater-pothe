@@ -4,6 +4,8 @@ export interface Env {
   DB: D1Database
   OAUTH_KV: KVNamespace
   MEDIA: R2Bucket
+  /** Cloudflare Images binding: responsive webp copies of uploads. Optional: without it only the (metadata-stripped) original is stored. */
+  IMAGES?: ImagesBinding
   OAUTH_PROVIDER: OAuthHelpers
   /** Public origins, e.g. https://mcp.example.com and https://example.com (no trailing slash). */
   MCP_ORIGIN: string

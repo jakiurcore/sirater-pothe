@@ -180,6 +180,136 @@ async function placesAndMedia(token: string) {
 }
 let created2 = true
 
+const SLUG3 = 'zz-smoke-uploads-delete-me'
+const sha = (b: Buffer | Uint8Array) => createHash('sha256').update(b).digest('hex')
+/** A JPEG with fake EXIF (GPS text) and a comment, structurally valid: proves the live server strips metadata. */
+function jpegWithExif(): Buffer {
+  const seg = (m: number, body: number[]) => [0xff, m, (body.length + 2) >> 8, (body.length + 2) & 255, ...body]
+  const a = (t: string) => [...Buffer.from(t)]
+  const exif = [...a('Exif'), 0, 0, 0x49, 0x49, 0x2a, 0, 8, 0, 0, 0, 1, 0, 0x12, 0x01, 3, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, ...a('GPS=21.4225,39.8262;Model=SmokeSecretCam')]
+  return Buffer.from([0xff, 0xd8, ...seg(0xe0, [...a('JFIF'), 0, 1, 1, 0, 0, 1, 0, 1, 0, 0]), ...seg(0xe1, exif), ...seg(0xfe, a('SmokeSecretComment')), ...seg(0xc0, [8, 0, 30, 0, 40, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), ...seg(0xda, [3, 1, 0, 2, 0x11, 3, 0x11, 0, 0x3f, 0]), ...Array.from({ length: 30 }, (_, i) => (i * 7 + 1) & 0x7f), 0xff, 0xd9])
+}
+
+/** Third scenario: ayah in_key_details + a picture through each of the four upload paths, positions in the preview, then revert. */
+async function placementAndUploads(token: string) {
+  console.log('\n── ayah placement + the four upload paths ──')
+  const started = new Date().toISOString()
+  let done = false
+  try {
+    const c = await tool(token, 'create_event_draft', { slug: SLUG3, era_slug: 'prophethood-in-makkah', hijri_year: -10, place_slug: 'zamzam', translation: { lang: 'bn', title: 'স্মোক টেস্ট: আয়াত ও ছবির স্থান (মুছে ফেলা হবে)', summary: 'প্রথম অনুচ্ছেদ: এটি স্বয়ংক্রিয় পরীক্ষার খসড়া।\n\nদ্বিতীয় অনুচ্ছেদ: এটি কখনও প্রকাশিত হবে না।', key_details: ['প্রথম পরীক্ষামূলক বিবরণ।', 'দ্বিতীয় পরীক্ষামূলক বিবরণ।', 'তৃতীয় পরীক্ষামূলক বিবরণ।'], lessons: ['প্রথম শিক্ষা।', 'দ্বিতীয় শিক্ষা।'] } })
+    ok(!c.isError, 'create_event_draft (2 paragraphs, 3 key details, 2 lessons)', c.isError ? c.text : '')
+    const lay = (await tool(token, 'get_event_layout', { event: SLUG3 })).json
+    ok(lay?.counts?.summary_paragraphs === 2 && lay.counts.key_details === 3 && lay.counts.lessons === 2 && lay.slots.key_details.length === 3, 'get_event_layout shows the numbered slots', JSON.stringify(lay?.counts))
+    const bad = await tool(token, 'attach_ayah', { event_slug: SLUG3, surah: 96, ayah: 1, placement: 'in_key_details', after_index: 9 })
+    ok(bad.isError && /valid after_index 0–2/.test(bad.text), 'an index that does not exist is refused with the valid range', bad.text.slice(0, 100))
+    const ay = await tool(token, 'attach_ayah', { event_slug: SLUG3, surah: 96, ayah: 1, placement: 'in_key_details', after_index: 1, placement_note: { bn: 'এই আয়াতে প্রথম ওহীর উল্লেখ আছে।' } })
+    ok(!ay.isError && ay.json?.ayat?.[0]?.arabic, 'attach_ayah in_key_details after #2, with a note (text comes from the server dataset)', ay.isError ? ay.text : '')
+
+    // A) base64, small
+    const a = await tool(token, 'upload_media', { event_slug: SLUG3, kind: 'pattern', alt: { bn: 'পরীক্ষামূলক সবুজ চতুর্ভুজ (base64)' }, contains_people_confirmation: false, base64: solidPng(320, 200, [46, 106, 97]).toString('base64'), placement: 'in_key_details', after_index: 1 })
+    ok(!a.isError && a.json?.placement === 'in_key_details', 'path 1: upload_media (base64)', a.isError ? a.text : `(${a.json?.processing})`)
+    // B) Wikimedia Commons URL (public domain satellite image, no people)
+    const b = await tool(token, 'upload_media', { event_slug: SLUG3, kind: 'landscape', alt: { bn: 'আন-নুফুদ মরুভূমির স্যাটেলাইট চিত্র' }, contains_people_confirmation: false, media_url: 'https://commons.wikimedia.org/wiki/File:Al-Nafud_Desert,_Saudi_Arabia_(MODIS_2026-01-17).jpg', placement: 'in_summary', after_index: 0 })
+    ok(!b.isError && b.json?.wikimedia?.license, 'path 2: upload_media with media_url (Wikimedia Commons)', b.isError ? b.text.slice(0, 160) : `(${b.json.wikimedia.license}; ${b.json.width}×${b.json.height}; variants ${JSON.stringify(b.json.variants)}; ${b.json.processing})`)
+    const nf = await tool(token, 'upload_media', { event_slug: SLUG3, kind: 'landscape', alt: { bn: 'পরীক্ষা' }, contains_people_confirmation: false, media_url: 'https://example.com/a.jpg' })
+    ok(nf.isError && /not allowed/.test(nf.text), 'media_url from any other host is refused')
+    // C) signed single-use PUT URL (what a client with a shell uses)
+    const u = await tool(token, 'create_upload_url', { event_slug: SLUG3, kind: 'landscape', alt: { bn: 'পরীক্ষামূলক ছবি (curl)' }, contains_people_confirmation: false, placement: 'end' })
+    ok(!u.isError && u.json?.upload_url, 'path 3: create_upload_url', u.isError ? u.text : '')
+    if (u.json?.upload_url) {
+      const put1 = await fetch(u.json.upload_url, { method: 'PUT', body: new Uint8Array(jpegWithExif()), headers: { 'Content-Type': 'application/octet-stream' } })
+      const pj = (await put1.json()) as { ok?: boolean; metadata_removed?: string[]; placement?: string }
+      ok(put1.status === 200 && pj.ok && pj.placement === 'end', 'PUT stores it at the bound placement', `(${put1.status})`)
+      ok(!!pj.metadata_removed?.includes('EXIF') && pj.metadata_removed.includes('comment'), 'EXIF/GPS and comment were removed from the stored file', JSON.stringify(pj.metadata_removed))
+      ok((await fetch(u.json.upload_url, { method: 'PUT', body: new Uint8Array(jpegWithExif()) })).status === 410, 'the URL works exactly once (second PUT → 410)')
+    }
+    // D) link to the site's upload page, driven in a browser like the owner would
+    const l = await tool(token, 'create_upload_link', { event_slug: SLUG3, kind: 'landscape', alt: { bn: 'পরীক্ষামূলক ছবি (লিংক)' }, contains_people_confirmation: false, placement: 'in_lessons', after_index: 0 })
+    ok(!l.isError && l.json?.upload_link, 'path 4: create_upload_link', l.isError ? l.text : '')
+    const { chromium } = await import('@playwright/test')
+    const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] })
+    try {
+      if (l.json?.upload_link) {
+        const page = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage()
+        await page.goto(l.json.upload_link)
+        ok((await page.locator('h1').innerText()) === 'ছবি আপলোড', 'the upload page opens in Bangla')
+        ok(/শিক্ষার ১ নম্বরের পরে/.test(await page.locator('.facts').innerText()), 'it shows where the picture will go (pre-filled)')
+        await page.locator('input[type=file]').setInputFiles({ name: 'smoke.png', mimeType: 'image/png', buffer: solidPng(320, 200, [180, 138, 60]) })
+        await page.getByRole('checkbox').check()
+        await page.getByRole('button', { name: 'আপলোড নিশ্চিত করুন' }).click()
+        await page.waitForSelector('.updone, .uperr', { timeout: 30_000 })
+        ok(await page.locator('.updone').count() === 1, 'confirming on the page uploads the picture', (await page.locator('.uperr').count()) ? await page.locator('.uperr').innerText() : '')
+        await page.goto(l.json.upload_link)
+        ok(/সঠিক নয়, মেয়াদ শেষ/.test(await page.locator('.uploadcard').innerText()), 'the link is dead afterwards')
+      }
+      // E) chunked fallback
+      const noise = deflateSync(randomBytes(120 * 120 * 3 + 120), { level: 0 })
+      const big = (() => { const png = solidPng(120, 120, [0, 0, 0]); return Buffer.concat([png.subarray(0, 33), ...(() => { const len = Buffer.alloc(4); len.writeUInt32BE(noise.length); const t = Buffer.from('IDAT'); return [len, t, noise, Buffer.alloc(4)] })(), png.subarray(png.length - 12)]) })()
+      const ch = await tool(token, 'upload_media_begin', { event_slug: SLUG3, kind: 'pattern', alt: { bn: 'পরীক্ষামূলক ছবি (খণ্ড খণ্ড)' }, contains_people_confirmation: false, placement: 'before_lessons', total_size: big.length, sha256: sha(big) })
+      ok(!ch.isError && ch.json?.chunk_count >= 2, 'path 5 (fallback): upload_media_begin', ch.isError ? ch.text : `(${big.length} bytes → ${ch.json?.chunk_count} chunks)`)
+      if (ch.json?.upload_id) {
+        const n = ch.json.chunk_count as number
+        let corrupted = false
+        for (let i = 0; i < n; i++) {
+          const part = big.subarray(i * 32768, (i + 1) * 32768)
+          if (i === 1 && !corrupted) { // a damaged chunk is refused, then the right one is accepted
+            const bad2 = Buffer.from(part); bad2[5]! ^= 1
+            const r0 = await tool(token, 'upload_media_chunk', { upload_id: ch.json.upload_id, index: i, base64: bad2.toString('base64'), chunk_sha256: sha(part) })
+            ok(r0.isError && /hash mismatch.*again/.test(r0.text), 'a damaged chunk is refused and must be sent again', r0.text.slice(0, 80)); corrupted = true
+          }
+          const r = await tool(token, 'upload_media_chunk', { upload_id: ch.json.upload_id, index: i, base64: part.toString('base64'), chunk_sha256: sha(part) })
+          if (r.isError) ok(false, `chunk ${i}`, r.text)
+        }
+        const fin = await tool(token, 'upload_media_finish', { upload_id: ch.json.upload_id })
+        ok(!fin.isError && fin.json?.placement === 'before_lessons', 'upload_media_finish verifies the whole file and stores it', fin.isError ? fin.text : '')
+      }
+
+      // positions + responsive copies, as the owner would see them
+      const ev = (await tool(token, 'get_event', { slug: SLUG3 })).json
+      ok(ev?.media?.length === 5 && ev.ayat?.length === 1, 'the event now has 1 ayah and 5 pictures', `(${ev?.media?.length} pictures)`)
+      const big2 = ev?.media?.find((m: any) => m.width && m.width > 600)
+      ok(!big2 || big2.variants.length > 0, 'larger pictures got responsive webp copies (Images binding)', JSON.stringify(ev?.media?.map((m: any) => [m.width, m.variants])))
+      const pre = await tool(token, 'preview_event', { slug: SLUG3, ttl_minutes: 10 })
+      if (pre.json?.url) {
+        for (const [name, vp] of [['mobile', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 860 }]] as const) {
+          const page = await (await browser.newContext({ viewport: vp })).newPage()
+          await page.goto(pre.json.url)
+          await page.waitForSelector('article .keys')
+          for (const f of await page.locator('figure.pic').all()) { await f.scrollIntoViewIfNeeded(); await page.waitForTimeout(150) }
+          const seq = await page.evaluate(() => {
+            const out: string[] = []; let sum = -1, key = -1, les = -1
+            for (const el of document.querySelectorAll('article .sum, article .keys > li:not(.keypic), article .lessons > li:not(.keypic), article figure.pic, article .ayahwrap')) {
+              if (el.matches('.sum')) out.push(`sum${++sum}`)
+              else if (el.matches('.keys > li')) out.push(`key${++key}`)
+              else if (el.matches('.lessons > li')) out.push(`lesson${++les}`)
+              else if (el.matches('.ayahwrap')) out.push('AYAH')
+              else out.push(`pic:${(el as HTMLElement).dataset.placement}`)
+            }
+            return out.join(' ')
+          })
+          ok(seq === 'sum0 pic:in_summary sum1 key0 key1 AYAH pic:in_key_details key2 pic:before_lessons lesson0 pic:in_lessons lesson1 pic:end', `${name}: ayah and pictures render at their slots`, `(${seq})`)
+          const imgs = await page.evaluate(() => [...document.querySelectorAll('figure.pic img')].map((i) => (i as HTMLImageElement).naturalWidth))
+          ok(imgs.length === 5 && imgs.every((w) => w > 0), `${name}: all 5 pictures load`, JSON.stringify(imgs))
+          const note = await page.locator('.ayahnote').innerText().catch(() => '')
+          ok(/প্রথম ওহীর/.test(note), `${name}: the placement note shows above the ayah card`)
+        }
+      }
+    } finally { await browser.close() }
+
+    const revs = await tool(token, 'list_revisions', { event_slug: SLUG3 })
+    const creation = revs.json?.revisions?.find((r: { action: string }) => r.action === 'create')
+    if (creation) {
+      const rv = await tool(token, 'revert_revision', { revision_id: creation.revision_id })
+      ok(!rv.isError, 'revert_revision deletes the draft with its ayah, notes and all 5 pictures', rv.isError ? rv.text : '')
+      done = true
+      ok((await tool(token, 'get_event', { slug: SLUG3 })).isError, 'the draft no longer exists')
+    }
+  } finally {
+    if (!done) console.log(`\n!! Test draft "${SLUG3}" may still exist. Remove it via revert_revision or tell Claude.`)
+    console.log(`\n(test window ${started} → ${new Date().toISOString()}; Claude removes the leftover test revisions/audit/upload rows from this window)`)
+  }
+}
+
 async function main() {
   const unauth = await fetch(`${MCP}/mcp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
   ok(unauth.status === 401 && /bearer/i.test(unauth.headers.get('www-authenticate') ?? ''), 'unauthenticated /mcp → 401 with a bearer challenge')
@@ -188,8 +318,8 @@ async function main() {
 
   const list = await rpc(token, 'tools/list')
   const names: string[] = list.body.result?.tools?.map((t: { name: string }) => t.name) ?? []
-  ok(names.length === 35, `tools/list returns all 35 tools`, `(${names.length})`)
-  for (const t of ['set_primary_place', 'add_event_place', 'remove_event_place', 'set_media_placement', 'attach_media', 'update_place']) ok(names.includes(t), `tool ${t} is listed`)
+  ok(names.length === 42, `tools/list returns all 42 tools`, `(${names.length})`)
+  for (const t of ['set_primary_place', 'add_event_place', 'remove_event_place', 'set_media_placement', 'attach_media', 'update_place', 'get_event_layout', 'set_ayah_placement', 'create_upload_url', 'create_upload_link', 'upload_media_begin', 'upload_media_chunk', 'upload_media_finish']) ok(names.includes(t), `tool ${t} is listed`)
 
   const eras = await tool(token, 'list_eras', {})
   ok(!eras.isError && eras.text.includes('prophethood-in-makkah'), 'list_eras sees the production seed (5 eras)')
@@ -229,6 +359,7 @@ async function main() {
     if (created) console.log(`\n!! Test draft "${SLUG}" may still exist. Remove it via revert_revision or tell Claude.`)
   }
   await placesAndMedia(token)
+  await placementAndUploads(token)
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nAll checks passed')
 }
 main().catch((e) => { console.error('\nError:', e instanceof Error ? e.message : e); failed++ }).finally(() => { rl.close(); process.exit(failed ? 1 : 0) })
